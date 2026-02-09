@@ -1,39 +1,13 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const getEmailConfig = () => {
-  const EMAIL_USER = process.env.EMAIL_USER || process.env.MAIL_USER;
-  const rawPass = process.env.EMAIL_PASS || process.env.MAIL_PASSWORD;
-  const EMAIL_PASS = rawPass ? rawPass.replace(/\s+/g, "") : rawPass;
-  const EMAIL_FROM = process.env.EMAIL_FROM || process.env.MAIL_FROM || EMAIL_USER;
-
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    throw new Error("Email credentials not configured. Set EMAIL_USER/EMAIL_PASS or MAIL_USER/MAIL_PASSWORD in .env");
-  }
-
-  return { EMAIL_USER, EMAIL_PASS, EMAIL_FROM };
-};
-
-const createTransporter = () => {
-  const { EMAIL_USER, EMAIL_PASS } = getEmailConfig();
-
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const sendOTPEmail = async (otp, email) => {
   try {
     console.log('Attempting to send OTP email to:', email);
-    const transporter = createTransporter();
 
-    const mailConfiguration = {
-      from: getEmailConfig().EMAIL_FROM,
+    const result = await resend.emails.send({
+      from: "CampusSync <noreply@resend.dev>",
       to: email,
       subject: "Email Verification OTP - CampusSync",
       html: `
@@ -47,10 +21,9 @@ export const sendOTPEmail = async (otp, email) => {
         <p style="color: #999; font-size: 12px; text-align: center;">If you didn't request this, please ignore this email.</p>
       </div>
     `,
-    };
+    });
 
-    const result = await transporter.sendMail(mailConfiguration);
-    console.log('OTP email sent successfully to:', email, 'MessageID:', result.messageId);
+    console.log('OTP email sent successfully to:', email, 'ID:', result.id);
     return result;
   } catch (error) {
     console.error('Error sending OTP email to:', email);
@@ -63,10 +36,9 @@ export const sendOTPEmail = async (otp, email) => {
 export const verifyMail = async (token, email) => {
   try {
     console.log('Attempting to send verification email to:', email);
-    const transporter = createTransporter();
 
-    const mailConfiguration = {
-      from: getEmailConfig().EMAIL_FROM,
+    const result = await resend.emails.send({
+      from: "CampusSync <noreply@resend.dev>",
       to: email,
       subject: "Email verification",
       html: `<h1>Email Verification</h1>
@@ -74,10 +46,9 @@ export const verifyMail = async (token, email) => {
            <a href="${process.env.CLIENT_URL}/verify-email?token=${token}">
              Verify Email
            </a>`,
-    };
+    });
 
-    const result = await transporter.sendMail(mailConfiguration);
-    console.log('Verification email sent successfully to:', email, 'MessageID:', result.messageId);
+    console.log('Verification email sent successfully to:', email, 'ID:', result.id);
     return result;
   } catch (error) {
     console.error('Error sending verification email to:', email);
