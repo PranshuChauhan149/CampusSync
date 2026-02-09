@@ -12,9 +12,6 @@ const adminCookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-/* =========================================================
-   ADMIN AUTH CONTROLLERS
-   ========================================================= */
 
 export const adminLogin = async (req, res) => {
   try {

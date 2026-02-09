@@ -405,22 +405,64 @@ const Navbar = () => {
                             No notifications
                           </div>
                         ) : (
-                          notifications.slice(0, 5).map((notification) => (
-                            <div
-                              key={notification._id}
-                              className={`p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                                !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                              }`}
-                              onClick={() => markAsRead(notification._id)}
-                            >
-                              <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                {notification.message}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {new Date(notification.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                          ))
+                          notifications.map((notification) => {
+                            // Determine highlight color for item types
+                            const itemType = notification.data?.itemType || (notification.type === 'item_added' ? 'add' : null);
+                            const isLost = itemType === 'lost' || notification.type === 'item_lost';
+                            const isFound = itemType === 'found' || notification.type === 'item_found';
+                            const bgClass = !notification.read
+                              ? isLost
+                                ? 'bg-red-50 dark:bg-red-900/20'
+                                : isFound
+                                ? 'bg-green-50 dark:bg-green-900/20'
+                                : 'bg-blue-50 dark:bg-blue-900/20'
+                              : '';
+
+                            const textClass = isLost ? 'text-red-700 dark:text-red-200' : isFound ? 'text-green-700 dark:text-green-200' : (isDarkMode ? 'text-gray-300' : 'text-gray-700');
+
+                            const handleNotificationClick = async (notif) => {
+                              try {
+                                await markAsRead(notif._id);
+                              } catch (e) {
+                                console.error('Failed to mark notification read', e);
+                              }
+                              setShowNotifications(false);
+                              const itemId = notif.data?.itemId || notif.data?.bookId || notif.data?.bookId;
+                              if (notif.data?.bookId) {
+                                navigate(`/book/${notif.data.bookId}`);
+                                return;
+                              }
+                              if (notif.data?.itemId) {
+                                navigate(`/item/${notif.data.itemId}`);
+                                return;
+                              }
+                              if (notif.data?.conversationId) {
+                                navigate('/chat', { state: { conversationId: notif.data.conversationId } });
+                                return;
+                              }
+                              // fallback: open notifications panel (stay)
+                            };
+
+                            const messageClass = isLost
+                              ? 'text-red-600 dark:text-red-100'
+                              : isFound
+                              ? 'text-green-600 dark:text-green-100'
+                              : (isDarkMode ? 'text-gray-200' : 'text-gray-800');
+
+                            return (
+                              <div
+                                key={notification._id}
+                                className={`p-3 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${bgClass}`}
+                                onClick={() => handleNotificationClick(notification)}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className={`text-sm font-medium truncate ${textClass}`}>{notification.title}</p>
+                                  <span className="text-xs text-gray-400">{new Date(notification.createdAt).toLocaleString()}</span>
+                                </div>
+                                <p className={`text-sm mt-1 ${messageClass}`}>{notification.message}</p>
+                              </div>
+                            );
+                          })
                         )}
                       </div>
                     </motion.div>

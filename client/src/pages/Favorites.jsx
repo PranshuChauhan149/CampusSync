@@ -16,46 +16,46 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { favoritesAPI, chatAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-import { favoritesAPI } from '../services/api';
+
 import { toast } from 'react-toastify';
 
 const Favorites = () => {
   const { isDarkMode } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-
-  const [favorites, setFavorites] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
   const [viewMode, setViewMode] = useState('grid');
   const [filterType, setFilterType] = useState('all'); // all, item, book
   const [selectedFavorite, setSelectedFavorite] = useState(null);
+  // Local favorites state (from API)
+  const [favoritesList, setFavoritesList] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
   const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchFavorites();
+      fetchFavorites(1);
     }
-  }, [isAuthenticated, page]);
+  }, [isAuthenticated]);
 
-  const fetchFavorites = async () => {
+  useEffect(() => {
+    // load more when page changes (except initial handled above)
+    if (page > 1 && isAuthenticated) fetchFavorites(page);
+  }, [page]);
+
+  const fetchFavorites = async (p = 1) => {
     try {
       setLoading(true);
-      const response = await favoritesAPI.getFavorites({ page, limit: 12 });
-      
-      if (response.data.success) {
-        const newFavorites = response.data.data || [];
-        
-        if (page === 1) {
-          setFavorites(newFavorites);
-        } else {
-          setFavorites(prev => [...prev, ...newFavorites]);
-        }
-        
-        setHasMore(page < response.data.pagination.pages);
-        console.log('❤️ Favorites loaded:', newFavorites.length);
-      }
+      const res = await favoritesAPI.getFavorites({ page: p, limit });
+      const data = res.data?.data || [];
+      const pagination = res.data?.pagination || {};
+      if (p === 1) setFavoritesList(data);
+      else setFavoritesList(prev => [...prev, ...data]);
+      setHasMore((pagination.pages || 0) > p);
     } catch (error) {
       console.error('❌ Error fetching favorites:', error);
       toast.error('Failed to load favorites');
@@ -64,41 +64,49 @@ const Favorites = () => {
     }
   };
 
+  const allFavorites = favoritesList || [];
+
+  const filteredFavorites = filterType === 'all' 
+    ? allFavorites 
+    : allFavorites.filter(fav => fav.type === filterType);
+
   const handleRemoveFavorite = async (itemId, isFavBook) => {
     try {
       const type = isFavBook ? 'book' : 'item';
-      const response = await favoritesAPI.removeFromFavorites(itemId, type);
-      
-      if (response.data.success) {
-        setFavorites(prev => 
-          prev.filter(fav => !(fav._id === itemId))
-        );
-        setSelectedFavorite(null);
-        toast.success('Removed from favorites');
-      }
+      await favoritesAPI.removeFromFavorites(itemId, type);
+      // optimistically remove
+      setFavoritesList(prev => prev.filter(f => f._id !== itemId && f.favoriteId !== itemId));
+      setSelectedFavorite(null);
+      toast.success('Removed from favorites');
     } catch (error) {
       console.error('❌ Error removing favorite:', error);
       toast.error('Failed to remove from favorites');
     }
   };
 
-  const handleMessageOwner = (itemId) => {
-    navigate(`/chat`);
+  const handleMessageOwner = async (fav) => {
+    try {
+      // Determine other user id
+      const otherUserId = fav.seller?._id || fav.reportedBy?._id || fav.seller || fav.reportedBy;
+      if (!otherUserId) return navigate('/chat');
+      const res = await chatAPI.getOrCreateConversation(otherUserId);
+      const conv = res.data?.data;
+      if (conv && conv._id) {
+        navigate('/chat', { state: { conversationId: conv._id } });
+      } else {
+        navigate('/chat');
+      }
+    } catch (error) {
+      console.error('❌ Error opening chat:', error);
+      navigate('/chat');
+    }
   };
 
   const getFavoriteType = (fav) => {
     if (fav.favoriteType) return fav.favoriteType;
-    if (fav.subject !== undefined) return 'book';
+    if (fav.subject !== undefined || fav.price !== undefined) return 'book';
     return 'item';
   };
-
-  const filteredFavorites = favorites.filter(fav => {
-    const favType = getFavoriteType(fav);
-    if (filterType === 'all') return true;
-    if (filterType === 'item') return favType === 'item';
-    if (filterType === 'book') return favType === 'book';
-    return true;
-  });
 
   const isBook = (fav) => getFavoriteType(fav) === 'book';
   const isItem = (fav) => getFavoriteType(fav) === 'item';
@@ -480,15 +488,15 @@ const Favorites = () => {
                     selectedFavorite.image ? (
                       <img src={selectedFavorite.image} alt={selectedFavorite.title} className="w-full h-64 object-cover rounded-lg" />
                     ) : (
-                      <div className="w-full h-64 flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg">
-                        <Book className="w-16 h-16 text-white" />
+                      <div className="w-full h-40 flex items-center justify-center bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg">
+                        <Book className="w-12 h-12 text-white" />
                       </div>
                     )
                   ) : selectedFavorite.images?.[0] ? (
                     <img src={selectedFavorite.images[0]} alt={selectedFavorite.title} className="w-full h-64 object-cover rounded-lg" />
                   ) : (
-                    <div className="w-full h-64 flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg">
-                      <MapPin className="w-16 h-16 text-white" />
+                    <div className="w-full h-40 flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg">
+                      <MapPin className="w-12 h-12 text-white" />
                     </div>
                   )}
                 </div>
@@ -545,7 +553,7 @@ const Favorites = () => {
               {/* Actions */}
               <div className="p-4 border-t border-gray-700 dark:border-gray-600 flex gap-3">
                 <motion.button
-                  onClick={() => handleRemoveFavorite(selectedFavorite._id, isBook(selectedFavorite) ? 'book' : 'item')}
+                  onClick={() => handleRemoveFavorite(selectedFavorite._id, isBook(selectedFavorite))}
                   className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -556,7 +564,7 @@ const Favorites = () => {
                 <motion.button
                   onClick={() => {
                     setSelectedFavorite(null);
-                    handleMessageOwner(selectedFavorite._id);
+                    handleMessageOwner(selectedFavorite);
                   }}
                   className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
                   whileHover={{ scale: 1.02 }}

@@ -10,9 +10,10 @@ import {
   getMyItems,
   getReceivedClaims,
   getSentClaims,
-  updateClaimStatus
+  updateClaimStatus,
+  incrementItemView
 } from '../controllers/itemController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, optionalAuth } from '../middlewares/auth.js';
 
 const router = express.Router();
 
@@ -45,6 +46,7 @@ router.put('/claims/:claimId/status', authenticate, updateClaimStatus);
 
 // Dynamic :id routes must come after specific paths
 router.get('/:id', getItemById);
+router.post('/:id/view', optionalAuth, incrementItemView);
 
 router.post('/', authenticate, upload.array('images', 5), createItem);
 router.put('/:id', authenticate, upload.array('images', 5), updateItem);

@@ -1,6 +1,7 @@
 import Conversation from "../models/conversationModel.js";
 import Message from "../models/messageModel.js";
 import User from "../models/userModel.js";
+import { uploadToCloudinary } from "../config/cloudinary.js";
 import mongoose from "mongoose";
 
 // Get all conversations for a user
@@ -167,6 +168,7 @@ export const sendMessage = async (req, res) => {
     const userId = req.user._id;
     const { conversationId } = req.params;
     const { content } = req.body;
+    const file = req.file;
 
     console.log(`\n📨 ============================================`);
     console.log(`📨 SEND MESSAGE REQUEST`);
@@ -182,8 +184,8 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    if (!content || content.trim() === '') {
-      console.log(`❌ Empty message`);
+    if ((!content || content.trim() === '') && !file) {
+      console.log(`❌ Empty message and no attachment`);
       return res.status(400).json({
         success: false,
         message: 'Message content cannot be empty',
@@ -212,11 +214,29 @@ export const sendMessage = async (req, res) => {
     }
 
     // Create message
-    const message = new Message({
+    const messageData = {
       conversation: conversationId,
       sender: userId,
-      content: content.trim(),
-    });
+      content: content ? content.trim() : '',
+      messageType: 'text',
+      attachments: [],
+    };
+
+    // If an image file was uploaded, upload to Cloudinary and attach
+    if (file) {
+      try {
+        console.log(`📸 Uploading image to Cloudinary (${file.originalname})`);
+        const result = await uploadToCloudinary(file.buffer, 'chat');
+        console.log(`✅ Uploaded to Cloudinary: ${result.secure_url}`);
+        messageData.messageType = 'image';
+        messageData.attachments.push({ url: result.secure_url, type: 'image', name: file.originalname });
+        // If no text content, leave content empty string
+      } catch (err) {
+        console.error('❌ Cloudinary upload failed:', err);
+      }
+    }
+
+    const message = new Message(messageData);
 
     await message.save();
     await message.populate('sender', 'username email');

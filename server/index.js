@@ -70,11 +70,11 @@ io.on("connection", (socket) => {
   console.log("\n🔌 ============================================");
   console.log("✅ User connected:", socket.id);
 
-  // User joins their room
+  // User joins their room for chat
   socket.on("join", (userId) => {
     socket.join(userId);
     userSockets.set(userId, socket.id);
-    console.log(`👤 User ${userId} joined personal room`);
+    console.log(`👤 User ${userId} joined room for chat`);
     console.log(`   Socket ID: ${socket.id}`);
     
     // Emit user online status

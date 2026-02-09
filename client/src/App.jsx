@@ -22,6 +22,8 @@ import StudyMaterial from './pages/StudyMaterial';
 import ClaimRequests from './pages/ClaimRequests';
 import ClaimHistory from './pages/ClaimHistory';
 import Admin from './pages/Admin';
+import ItemDetail from './pages/ItemDetail';
+import BookDetail from './pages/BookDetail';
 
 function App() {
   return (
@@ -50,7 +52,9 @@ function App() {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/lost-found" element={<LostAndFound />} />
+                <Route path="/item/:id" element={<ItemDetail />} />
                 <Route path="/books" element={<Books />} />
+                <Route path="/book/:id" element={<BookDetail />} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/favorites" element={<Favorites />} />

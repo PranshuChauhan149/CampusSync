@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -49,12 +51,28 @@ const Login = () => {
     }
   };
 
+  const outerBg = isDarkMode
+    ? 'bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900'
+    : 'bg-gradient-to-br from-blue-50 via-pink-50 to-white';
+
+  const subtleBg = isDarkMode
+    ? 'from-blue-500/10 via-purple-500/10 to-pink-500/10'
+    : 'from-blue-100/40 via-purple-100/40 to-pink-100/40';
+
+  const cardBg = isDarkMode
+    ? 'relative bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 rounded-3xl shadow-2xl p-8 border border-blue-500/20 backdrop-blur-md'
+    : 'relative bg-white/95 rounded-3xl shadow-2xl p-8 border border-gray-200 backdrop-blur-sm';
+
+  const inputClass = isDarkMode
+    ? 'w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition backdrop-blur-sm'
+    : 'w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className={`min-h-screen ${outerBg} flex items-center justify-center p-4 relative overflow-hidden`}>
   
       {/* Animated background gradient */}
       <motion.div
-        className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10"
+        className={`absolute inset-0 bg-gradient-to-br ${subtleBg}`}
         animate={{
           opacity: [0.5, 0.8, 0.5],
         }}
@@ -83,7 +101,7 @@ const Login = () => {
         />
 
         <motion.div
-          className="relative bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 rounded-3xl shadow-2xl p-8 border border-blue-500/20 backdrop-blur-md"
+          className={cardBg}
           whileHover={{ y: -5 }}
           transition={{ type: 'spring', stiffness: 300 }}
         >
@@ -101,8 +119,8 @@ const Login = () => {
             >
               CampusSync
             </motion.h1>
-            <motion.p 
-              className="text-slate-400 text-lg"
+              <motion.p 
+              className={isDarkMode ? 'text-slate-400 text-lg' : 'text-gray-600 text-lg'}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
@@ -141,7 +159,7 @@ const Login = () => {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="Enter your email"
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition backdrop-blur-sm"
+                className={inputClass}
                 whileFocus={{ scale: 1.02 }}
               />
             </motion.div>
@@ -169,7 +187,7 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter your password"
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition backdrop-blur-sm pr-10"
+                  className={`${inputClass} pr-10`}
                   whileFocus={{ scale: 1.02 }}
                 />
                 <motion.button
@@ -193,7 +211,7 @@ const Login = () => {
             >
               <motion.a 
                 href="/forgot-password" 
-                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition"
+                className={isDarkMode ? 'text-blue-400 hover:text-blue-300 text-sm font-medium transition' : 'text-blue-600 hover:text-blue-500 text-sm font-medium transition'}
                 whileHover={{ x: 5 }}
               >
                 Forgot password?
@@ -209,7 +227,7 @@ const Login = () => {
               transition={{ delay: 0.3 }}
               whileHover={{ scale: 1.02, boxShadow: '0 20px 40px rgba(59, 130, 246, 0.3)' }}
               whileTap={{ scale: 0.98 }}
-              className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg relative overflow-hidden"
+              className={`w-full mt-6 px-4 py-3 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg relative overflow-hidden`}
             >
               {loading ? (
                 <span className="flex items-center justify-center">

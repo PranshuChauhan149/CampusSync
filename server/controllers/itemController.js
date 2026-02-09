@@ -3,7 +3,6 @@ import ItemClaim from "../models/itemClaimModel.js";
 import Notification from "../models/notificationModel.js";
 import User from "../models/userModel.js";
 import { uploadToCloudinary, deleteFromCloudinary } from "../config/cloudinary.js";
-import { sendItemNotificationEmail } from "../config/verifyEmail.js";
 
 // Get all items with filtering and pagination
 export const getItems = async (req, res) => {
@@ -71,7 +70,7 @@ export const getItemById = async (req, res) => {
     const { id } = req.params;
 
     const item = await Item.findById(id)
-      .populate('reportedBy', 'username email')
+      .populate('reportedBy', 'username email createdAt')
       .populate('claimedBy', 'username email');
 
     if (!item) {
@@ -79,11 +78,6 @@ export const getItemById = async (req, res) => {
         success: false,
         message: 'Item not found'
       });
-    }
-
-    // Increment view count if not viewed by the reporter
-    if (req.user && req.user._id.toString() !== item.reportedBy._id.toString()) {
-      await Item.findByIdAndUpdate(id, { $inc: { views: 1 } });
     }
 
     res.status(200).json({
@@ -95,6 +89,46 @@ export const getItemById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch item'
+    });
+  }
+};
+
+// Increment item view count (unique users only)
+export const incrementItemView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?._id;
+
+    const item = await Item.findById(id);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found'
+      });
+    }
+
+    // Check if user is the owner or has already viewed
+    const isOwner = userId && item.reportedBy.toString() === userId.toString();
+    const hasViewed = userId && item.viewedBy?.includes(userId);
+
+    if (!isOwner && !hasViewed) {
+      // Add user to viewedBy array and increment views
+      await Item.findByIdAndUpdate(id, {
+        $inc: { views: 1 },
+        $addToSet: { viewedBy: userId || null }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'View recorded'
+    });
+  } catch (error) {
+    console.error('Increment view error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record view'
     });
   }
 };
@@ -231,13 +265,22 @@ export const createItem = async (req, res) => {
     await item.populate('reportedBy', 'username email');
     console.log('✅ Item populated');
 
-    // Send real-time notifications and emails
-    console.log('📬 Starting notification process...');
+    // Emit real-time event for new item so clients can show notifications
     try {
-      await notifyUsersAboutNewItem(item, req.app.get('io'));
-      console.log('✅ Notifications completed');
-    } catch (notificationError) {
-      console.error('⚠️  Notification error (continuing anyway):', notificationError.message);
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('new-item', {
+          type: 'item_added',
+          itemType: item.type, // 'lost' or 'found'
+          title: item.title,
+          message: `${item.type === 'lost' ? 'Lost' : 'Found'}: ${item.title} - ${item.location}`,
+          itemId: item._id,
+          createdAt: item.createdAt,
+        });
+        console.log('📡 Emitted new-item event for', item._id);
+      }
+    } catch (emitErr) {
+      console.error('Error emitting new-item event:', emitErr);
     }
 
     res.status(201).json({
@@ -486,7 +529,7 @@ export const claimItem = async (req, res) => {
 
     // Do not auto-resolve item on claim request
 
-    // Create notification for the item reporter (non-blocking)
+    // Create notification for the item reporter
     try {
       await Notification.create({
         user: item.reportedBy,
@@ -495,15 +538,6 @@ export const claimItem = async (req, res) => {
         message: `New claim request for "${item.title}" from ${normalizedFullName}. Check details in your dashboard.`,
         data: { itemId: item._id, userId: req.user._id }
       });
-
-      const io = req.app.get('io');
-      if (io) {
-        io.to(item.reportedBy.toString()).emit('notification', {
-          type: 'item_claimed',
-          itemId: item._id,
-          message: `New claim request for "${item.title}" from ${normalizedFullName}`
-        });
-      }
     } catch (notifyError) {
       console.error('Claim notification error (continuing anyway):', notifyError);
     }
@@ -571,86 +605,6 @@ export const getMyItems = async (req, res) => {
       success: false,
       message: 'Failed to fetch your items'
     });
-  }
-};
-
-// Helper function to notify users about new items
-const notifyUsersAboutNewItem = async (item, io) => {
-  try {
-    console.log(`\n🔔 NOTIFICATION PROCESS FOR ITEM: "${item.title}"`);
-    console.log('============================================');
-    
-    // Get all verified users
-    const reporterId = item.reportedBy._id || item.reportedBy;
-    console.log(`🔍 Looking for verified users (reporter: ${reporterId})`);
-    
-    const users = await User.find({
-      isVerified: true
-    });
-
-    const reporterUser = await User.findById(reporterId);
-    const notifyUsers = reporterUser && !users.some(u => u._id.toString() === reporterId.toString())
-      ? [reporterUser, ...users]
-      : users;
-
-    console.log(`✅ Found ${notifyUsers.length} users to notify`);
-
-    // Create notifications for all users (including reporter)
-    const notifications = notifyUsers.map(user => ({
-      user: user._id,
-      type: 'item_match',
-      title: `New ${item.type} item reported`,
-      message: `${item.type === 'lost' ? 'Lost' : 'Found'}: ${item.title} - ${item.location}`,
-      data: { itemId: item._id }
-    }));
-
-    await Notification.insertMany(notifications);
-    console.log(`💾 Created ${notifications.length} database notification records`);
-
-    // Send real-time notifications
-    if (io) {
-      let socketCount = 0;
-      notifyUsers.forEach(user => {
-        io.to(user._id.toString()).emit('notification', {
-          type: 'item_match',
-          itemId: item._id,
-          message: `New ${item.type} item: ${item.title}`
-        });
-        socketCount++;
-      });
-      console.log(`📡 Sent ${socketCount} real-time Socket.io notifications`);
-    } else {
-      console.log('⚠️  Socket.io not available - skipping real-time notifications');
-    }
-
-    // Send email notifications to all users (excluding reporter)
-    const emailUsers = notifyUsers
-      .filter(user => user._id.toString() !== reporterId.toString());
-    console.log(`📧 Starting to send emails to ${emailUsers.length} users...`);
-    
-    const emailResults = await Promise.allSettled(
-      emailUsers.map(user => sendItemNotificationEmail(user.email, item))
-    );
-
-    let emailSuccessCount = 0;
-    let emailFailCount = 0;
-
-    emailResults.forEach((result, index) => {
-      const userEmail = emailUsers[index].email;
-      if (result.status === 'fulfilled') {
-        emailSuccessCount++;
-        console.log(`   ✅ Email sent successfully to: ${userEmail}`);
-      } else {
-        emailFailCount++;
-        console.error(`   ❌ Failed to send email to ${userEmail}:`, result.reason?.message || result.reason);
-      }
-    });
-
-    console.log(`📬 Email sending finished. Success: ${emailSuccessCount}, Failed: ${emailFailCount}`);
-    console.log('============================================\n');
-
-  } catch (error) {
-    console.error('❌ CRITICAL ERROR in notification process:', error);
   }
 };
 

@@ -78,8 +78,8 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (profileData) => {
     try {
       const res = await authAPI.updateProfile(profileData);
-      setUser(res.data.user);
-      return { success: true };
+      setUser(res.data.data || res.data.user || res.data);
+      return { success: true, data: res.data.data, message: res.data.message };
     } catch (error) {
       return {
         success: false,

@@ -72,7 +72,7 @@ const Books = () => {
   const [selectedImages, setSelectedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const fileInputRef = useRef(null);
-  const [isFavorited, setIsFavorited] = useState(false);
+  
 
   // Subjects for books
   const subjects = [
@@ -94,6 +94,23 @@ const Books = () => {
   useEffect(() => {
     fetchBooks();
   }, [filters]);
+
+  // Load user's favorite books (ids) when authenticated
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      try {
+        if (!isAuthenticated) return;
+        const res = await favoritesAPI.getFavorites({ limit: 200 });
+        const favs = res.data.data || [];
+        const favBookIds = favs.filter(f => f.favoriteType === 'book').map(b => b._id);
+        setFavorites(new Set(favBookIds));
+      } catch (error) {
+        console.error('Failed to fetch favorites:', error);
+      }
+    };
+
+    fetchFavorites();
+  }, [isAuthenticated]);
 
   const fetchBooks = async () => {
     try {
@@ -232,14 +249,28 @@ const Books = () => {
 
   const handleContactSeller = (book) => {
     if (!isAuthenticated) {
-      toast.error('Please login to contact seller');
+      toast.error('Please login to message the seller');
+      navigate('/login');
       return;
     }
 
-    const subject = `Inquiry about "${book.title}"`;
-    const body = `Hi ${book.seller.username},\n\nI'm interested in your book "${book.title}" listed for ${formatPrice(book.price)}.\n\nPlease let me know if it's still available.\n\nBest regards,\n${user.username}`;
+    if (!book?.seller?._id) {
+      toast.error('Seller information not available');
+      return;
+    }
 
-    window.open(`mailto:${book.seller.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    // Create or get conversation and navigate to chat with conversationId
+    (async () => {
+      try {
+        const response = await chatAPI.getOrCreateConversation(book.seller._id);
+        const conversation = response.data?.data || response.data;
+        const conversationId = conversation._id || conversation?._id;
+        navigate('/chat', { state: { conversationId } });
+      } catch (error) {
+        console.error('Failed to start chat with seller:', error);
+        toast.error('Failed to open chat');
+      }
+    })();
   };
 
   const handleMessageSeller = async (sellerId) => {
@@ -250,10 +281,11 @@ const Books = () => {
     }
 
     try {
-      // Create or get conversation with seller
       const response = await chatAPI.getOrCreateConversation(sellerId);
+      const conversation = response.data?.data || response.data;
+      const conversationId = conversation._id || conversation?._id;
       setShowBookModal(false);
-      navigate('/chat');
+      navigate('/chat', { state: { conversationId } });
       toast.success('Chat opened!');
     } catch (error) {
       console.error('Failed to start chat:', error);
@@ -269,13 +301,18 @@ const Books = () => {
     }
 
     try {
-      if (isFavorited) {
+      const isFav = favorites.has(bookId);
+      if (isFav) {
         await favoritesAPI.removeFromFavorites(bookId, 'book');
-        setIsFavorited(false);
+        const next = new Set(favorites);
+        next.delete(bookId);
+        setFavorites(next);
         toast.success('Removed from favorites');
       } else {
         await favoritesAPI.addToFavorites(bookId, 'book');
-        setIsFavorited(true);
+        const next = new Set(favorites);
+        next.add(bookId);
+        setFavorites(next);
         toast.success('Added to favorites');
       }
     } catch (error) {
@@ -284,19 +321,7 @@ const Books = () => {
     }
   };
 
-  const checkIfFavorited = async (bookId) => {
-    if (!isAuthenticated) {
-      setIsFavorited(false);
-      return;
-    }
-
-    try {
-      const response = await favoritesAPI.checkFavorite(bookId, 'book');
-      setIsFavorited(response.data.isFavorited);
-    } catch (error) {
-      console.error('Failed to check favorite status:', error);
-    }
-  };
+  
 
   const getConditionColor = (condition) => {
     return conditions.find(c => c.value === condition)?.color || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
@@ -530,11 +555,7 @@ const Books = () => {
                 className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-300 ${
                   isDarkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-800/80' : 'bg-white border-gray-200 hover:bg-white/80'
                 }`}
-                onClick={() => {
-                  setSelectedBook(book);
-                  checkIfFavorited(book._id);
-                  setShowBookModal(true);
-                }}
+                onClick={() => navigate(`/book/${book._id}`)}
               >
                 {/* Book Image */}
                 <div className="aspect-w-16 aspect-h-12 bg-gray-200 dark:bg-gray-700 relative">
@@ -547,6 +568,13 @@ const Books = () => {
                   ) : (
                     <div className="w-full h-48 flex items-center justify-center">
                       <BookOpen className="w-12 h-12 text-gray-400" />
+                    </div>
+                  )}
+
+                  {/* Sold overlay */}
+                  {book.status === 'sold' && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <span className="bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold tracking-wide">SOLD</span>
                     </div>
                   )}
 
@@ -582,13 +610,12 @@ const Books = () => {
 
                 {/* Book Details */}
                 <div className="p-4">
-                  <h3 className={`font-semibold text-lg mb-1 line-clamp-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {book.title}
-                  </h3>
+                  <h3 className={`font-semibold text-lg mb-1 line-clamp-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{book.title}</h3>
 
-                  <p className={`text-sm mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    by {book.author}
-                  </p>
+                  <p className={`text-sm mb-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>by {book.author}</p>
+                  {book.seller?.username && (
+                    <p className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Seller: {book.seller.username}</p>
+                  )}
 
                   <p className={`text-sm mb-3 line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     {book.description}
@@ -620,10 +647,10 @@ const Books = () => {
                           e.stopPropagation();
                           handleContactSeller(book);
                         }}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium flex items-center gap-1"
+                        className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 flex items-center gap-2"
                       >
                         <MessageCircle className="w-4 h-4" />
-                        Contact
+                        Message Seller
                       </button>
                     </div>
                   </div>
@@ -1193,15 +1220,15 @@ const Books = () => {
                           <button
                             onClick={() => toggleFavorite(selectedBook._id)}
                             className={`py-2 px-4 rounded-lg transition-colors text-sm flex items-center justify-center gap-2 ${
-                              isFavorited
+                              favorites.has(selectedBook._id)
                                 ? 'bg-red-600 hover:bg-red-700 text-white'
                                 : isDarkMode
                                   ? 'bg-gray-700 hover:bg-gray-600 text-white'
                                   : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
                             }`}
                           >
-                            <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
-                            {isFavorited ? 'Saved' : 'Save'}
+                            <Heart className={`w-4 h-4 ${favorites.has(selectedBook._id) ? 'fill-current' : ''}`} />
+                            {favorites.has(selectedBook._id) ? 'Saved' : 'Save'}
                           </button>
                         </div>
                       </div>

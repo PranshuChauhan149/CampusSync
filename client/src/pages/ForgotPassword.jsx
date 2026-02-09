@@ -5,11 +5,13 @@ import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { Mail, Send, KeyRound } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -40,12 +42,28 @@ const ForgotPassword = () => {
     }
   };
 
+  const outerBg = isDarkMode
+    ? 'bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900'
+    : 'bg-gradient-to-br from-blue-50 via-pink-50 to-white';
+
+  const subtleBg = isDarkMode
+    ? 'from-blue-500/10 via-purple-500/10 to-pink-500/10'
+    : 'from-blue-100/40 via-purple-100/40 to-pink-100/40';
+
+  const cardBg = isDarkMode
+    ? 'relative bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 rounded-3xl shadow-2xl p-8 border border-blue-500/20 backdrop-blur-md'
+    : 'relative bg-white/95 rounded-3xl shadow-2xl p-8 border border-gray-200 backdrop-blur-sm';
+
+  const inputClass = isDarkMode
+    ? 'w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition backdrop-blur-sm'
+    : 'w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className={`min-h-screen ${outerBg} flex items-center justify-center p-4 relative overflow-hidden`}>
      
       {/* Animated background gradient */}
       <motion.div
-        className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10"
+        className={`absolute inset-0 bg-gradient-to-br ${subtleBg}`}
         animate={{
           opacity: [0.5, 0.8, 0.5],
         }}
@@ -74,7 +92,7 @@ const ForgotPassword = () => {
         />
 
         <motion.div
-          className="relative bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 rounded-3xl shadow-2xl p-8 border border-blue-500/20 backdrop-blur-md"
+          className={cardBg}
           whileHover={{ y: -5 }}
           transition={{ type: 'spring', stiffness: 300 }}
         >
@@ -98,7 +116,7 @@ const ForgotPassword = () => {
               </motion.div>
             </motion.div>
             <motion.h1 
-              className="text-3xl font-bold text-white mb-2"
+              className={isDarkMode ? 'text-3xl font-bold text-white mb-2' : 'text-3xl font-bold text-gray-900 mb-2'}
               animate={{ y: [0, -3, 0] }}
               transition={{ duration: 4, repeat: Infinity }}
             >
@@ -137,13 +155,13 @@ const ForgotPassword = () => {
                 </motion.div>
                 Email Address
               </label>
-              <motion.input
+                <motion.input
                 type="email"
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email address"
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition backdrop-blur-sm"
+                className={inputClass}
                 whileFocus={{ scale: 1.02 }}
               />
             </motion.div>

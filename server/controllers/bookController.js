@@ -2,7 +2,6 @@ import Book from '../models/bookModel.js';
 import User from '../models/userModel.js';
 import Notification from '../models/notificationModel.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../config/cloudinary.js';
-import { sendBookNotificationEmail } from '../config/verifyEmail.js';
 import mongoose from 'mongoose';
 
 // Get all books with filtering and pagination
@@ -89,7 +88,7 @@ export const getBookById = async (req, res) => {
     }
 
     const book = await Book.findById(id)
-      .populate('seller', 'username email profilePicture')
+      .populate('seller', 'username email profilePicture createdAt')
       .populate('buyer', 'username email profilePicture');
 
     if (!book) {
@@ -98,9 +97,6 @@ export const getBookById = async (req, res) => {
         message: 'Book not found'
       });
     }
-
-    // Increment view count
-    await Book.findByIdAndUpdate(id, { $inc: { views: 1 } });
 
     res.json({
       success: true,
@@ -111,6 +107,54 @@ export const getBookById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch book',
+      error: error.message
+    });
+  }
+};
+
+// Increment book view count (unique users only)
+export const incrementBookView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?._id;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid book ID'
+      });
+    }
+
+    const book = await Book.findById(id);
+
+    if (!book) {
+      return res.status(404).json({
+        success: false,
+        message: 'Book not found'
+      });
+    }
+
+    // Check if user is the seller or has already viewed
+    const isSeller = userId && book.seller.toString() === userId.toString();
+    const hasViewed = userId && book.viewedBy?.includes(userId);
+
+    if (!isSeller && !hasViewed) {
+      // Add user to viewedBy array and increment views
+      await Book.findByIdAndUpdate(id, {
+        $inc: { views: 1 },
+        $addToSet: { viewedBy: userId || null }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'View recorded'
+    });
+  } catch (error) {
+    console.error('Error incrementing book view:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record view',
       error: error.message
     });
   }
@@ -240,6 +284,24 @@ export const createBook = async (req, res) => {
       console.log('✅ Notifications completed');
     } catch (notificationError) {
       console.error('⚠️  Notification error (continuing anyway):', notificationError.message);
+    }
+
+    // Emit real-time event for new book so connected clients see it immediately
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('new-book', {
+          type: 'book_listing',
+          title: `New Book: ${book.title}`,
+          message: `${book.title} by ${book.author} listed for ₹${book.price}`,
+          bookId: book._id,
+          price: book.price,
+          createdAt: book.createdAt,
+        });
+        console.log('📡 Emitted new-book event for', book._id);
+      }
+    } catch (emitErr) {
+      console.error('Error emitting new-book event:', emitErr);
     }
 
     res.status(201).json({
@@ -541,55 +603,6 @@ const notifyUsersAboutNewBook = async (book, io) => {
     const insertedNotifications = await Notification.insertMany(notifications);
     console.log(`💾 Created ${insertedNotifications.length} database notification records`);
 
-    // Send real-time Socket.io notifications
-    if (io) {
-      let socketCount = 0;
-      users.forEach(user => {
-        io.to(user._id.toString()).emit('notification', {
-          type: 'book_listing',
-          bookId: book._id,
-          message: `New book available: ${book.title} by ${book.author} - $${book.price}`
-        });
-        socketCount++;
-      });
-      console.log(`📡 Sent ${socketCount} real-time Socket.io notifications`);
-    } else {
-      console.log('⚠️  Socket.io not available - skipping real-time notifications');
-    }
-
-    // Send email notifications (await results)
-    const sellerName = book.seller.username || book.seller.email || 'A seller';
-    console.log(`📧 Starting to send emails to ${users.length} users...`);
-
-    const emailResults = await Promise.allSettled(
-      users.map(user =>
-        sendBookNotificationEmail(user.email, {
-          bookTitle: book.title,
-          author: book.author,
-          price: book.price,
-          subject: book.subject,
-          condition: book.condition,
-          sellerName: sellerName,
-          bookId: book._id
-        })
-      )
-    );
-
-    let emailSuccessCount = 0;
-    let emailFailCount = 0;
-
-    emailResults.forEach((result, index) => {
-      const userEmail = users[index].email;
-      if (result.status === 'fulfilled') {
-        emailSuccessCount++;
-        console.log(`   ✅ Email sent successfully to: ${userEmail}`);
-      } else {
-        emailFailCount++;
-        console.error(`   ❌ Failed to send email to ${userEmail}:`, result.reason?.message || result.reason);
-      }
-    });
-
-    console.log(`📬 Email sending finished. Success: ${emailSuccessCount}, Failed: ${emailFailCount}`);
     console.log('============================================\n');
 
   } catch (error) {

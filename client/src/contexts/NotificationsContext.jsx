@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { notificationsAPI } from '../services/api';
 import { useAuth } from './AuthContext';
 import io from 'socket.io-client';
@@ -17,41 +17,7 @@ export const NotificationsProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const { isAuthenticated, user } = useAuth();
-
-  // Socket connection for real-time notifications
-  useEffect(() => {
-    let socket;
-
-    if (isAuthenticated && user) {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      socket = io(API_BASE_URL, {
-        auth: {
-          token: localStorage.getItem('campusSync-token')
-        }
-      });
-
-      socket.on('notification', (notification) => {
-        setNotifications(prev => [notification, ...prev]);
-        setUnreadCount(prev => prev + 1);
-      });
-
-      socket.on('notification-read', ({ notificationId }) => {
-        setNotifications(prev =>
-          prev.map(notif =>
-            notif._id === notificationId ? { ...notif, read: true } : notif
-          )
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      });
-    }
-
-    return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-    };
-  }, [isAuthenticated, user]);
+  const { isAuthenticated } = useAuth();
 
   // Fetch notifications on mount and when authenticated
   const fetchNotifications = useCallback(async () => {
@@ -67,6 +33,61 @@ export const NotificationsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
+  }, [isAuthenticated]);
+
+  // Real-time notifications via socket
+  const socketRef = useRef(null);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+    const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, '');
+    socketRef.current = io(SOCKET_URL, { withCredentials: true });
+
+    socketRef.current.on('connect', () => {
+      // console.log('Notifications socket connected', socketRef.current.id);
+    });
+
+    socketRef.current.on('new-item', (data) => {
+      try {
+        const newNotif = {
+          _id: `socket-${Date.now()}`,
+          type: data.type || 'item_added',
+          title: data.title || 'New item',
+          message: data.message || data.title,
+          data: { itemId: data.itemId, itemType: data.itemType },
+          read: false,
+          createdAt: data.createdAt || new Date().toISOString(),
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      } catch (e) {
+        console.error('Failed to handle new-item socket event', e);
+      }
+    });
+
+    socketRef.current.on('new-book', (data) => {
+      try {
+        const newNotif = {
+          _id: `socket-book-${Date.now()}`,
+          type: data.type || 'book_listing',
+          title: data.title || 'New book listed',
+          message: data.message || data.title,
+          data: { bookId: data.bookId, price: data.price },
+          read: false,
+          createdAt: data.createdAt || new Date().toISOString(),
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      } catch (e) {
+        console.error('Failed to handle new-book socket event', e);
+      }
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {

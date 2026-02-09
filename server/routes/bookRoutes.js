@@ -8,9 +8,10 @@ import {
   deleteBook,
   markBookAsSold,
   getMyBooks,
-  getBooksBySubject
+  getBooksBySubject,
+  incrementBookView
 } from '../controllers/bookController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, optionalAuth } from '../middlewares/auth.js';
 
 const router = express.Router();
 
@@ -41,6 +42,7 @@ router.get('/my-books', authenticate, getMyBooks);
 
 // Dynamic :id routes must come after specific paths
 router.get('/:id', getBookById);
+router.post('/:id/view', optionalAuth, incrementBookView);
 
 router.post('/', authenticate, upload.array('images', 5), createBook);
 router.put('/:id', authenticate, upload.array('images', 5), updateBook);

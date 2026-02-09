@@ -1,63 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useAnimation, useInView } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  Search,
   MapPin,
   BookOpen,
   MessageCircle,
   Bell,
-  TrendingUp,
-  Users,
-  Package,
-  Star,
   ArrowRight,
-  CheckCircle,
   Facebook,
   Twitter,
   Instagram,
-  Github
+  Github,
+  Star
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { statsAPI, booksAPI } from '../services/api';
-import Navbar from '../components/Navbar';
+import { booksAPI } from '../services/api';
+
 
 // Skeleton Loader Component
 const SkeletonLoader = ({ className }) => (
   <div className={`animate-pulse bg-gray-300 dark:bg-gray-700 rounded ${className}`}></div>
 );
 
-// Stats Card Component
-const StatsCard = ({ icon: Icon, value, label, color, isLoading }) => {
-  const { isDarkMode } = useTheme();
-
-  return (
-    <motion.div
-      whileHover={{ scale: 1.05, y: -5 }}
-      className={`p-6 rounded-xl backdrop-blur-sm border transition-all duration-300 ${
-        isDarkMode
-          ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'
-          : 'bg-white/50 border-gray-200 hover:bg-white/70'
-      }`}
-    >
-      <div className="flex items-center justify-center mb-4">
-        <div className={`p-3 rounded-full ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-      {isLoading ? (
-        <SkeletonLoader className="h-8 w-16 mx-auto mb-2" />
-      ) : (
-        <div className={`text-3xl font-bold text-center mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-          {value}
-        </div>
-      )}
-      <div className={`text-sm text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-        {label}
-      </div>
-    </motion.div>
-  );
-};
+// (Stats removed — cleaned up homepage to focus on features and testimonials)
 
 // Feature Card Component
 const FeatureCard = ({ icon: Icon, title, description, color, delay = 0 }) => {
@@ -145,41 +110,11 @@ const BookCard = ({ book, isLoading }) => {
 
 const Home = () => {
   const { isDarkMode } = useTheme();
-  const [stats, setStats] = useState({});
   const [books, setBooks] = useState([]);
-  const [loadingStats, setLoadingStats] = useState(true);
   const [loadingBooks, setLoadingBooks] = useState(true);
 
   // Fetch stats and books on component mount
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        console.log('📊 Fetching live campus statistics...');
-        const response = await statsAPI.getStats();
-        console.log('✅ Stats received:', response.data);
-        
-        // Extract data from response
-        const statsData = response.data.data || response.data;
-        setStats({
-          totalItems: statsData.totalItems || 0,
-          itemsRecovered: statsData.itemsRecovered || 0,
-          booksSold: statsData.booksSold || 0,
-          activeUsers: statsData.activeUsers || 0
-        });
-      } catch (error) {
-        console.error('❌ Failed to fetch stats:', error);
-        // Set to 0 if API fails
-        setStats({
-          totalItems: 0,
-          itemsRecovered: 0,
-          booksSold: 0,
-          activeUsers: 0
-        });
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-
     const fetchBooks = async () => {
       try {
         const response = await booksAPI.getBooks({ limit: 4 });
@@ -198,7 +133,6 @@ const Home = () => {
       }
     };
 
-    fetchStats();
     fetchBooks();
   }, []);
 
@@ -226,9 +160,9 @@ const Home = () => {
     },
     {
       icon: Bell,
-      title: 'Instant Notifications',
-      description: 'Get notified immediately when matches are found or new messages arrive.',
-      color: 'bg-purple-500',
+      title: 'AI-powered Learning',
+      description: 'Personalized study suggestions, topic summaries and smart note (TNote) generation to help you learn faster.',
+      color: 'bg-indigo-500',
       delay: 0.4
     }
   ];
@@ -259,7 +193,7 @@ const Home = () => {
 
       {/* Hero Section */}
       <section className="relative py-20 px-4 overflow-hidden">
-        <div className="max-w-6xl mx-auto text-center">
+        <div className="max-w-6xl mx-auto text-center ">
           <motion.h1
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -285,21 +219,28 @@ const Home = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12"
           >
             <Link
               to="/lost-found"
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2"
             >
               <MapPin className="w-5 h-5" />
               Report Lost Item
             </Link>
             <Link
               to="/books"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2"
             >
               <BookOpen className="w-5 h-5" />
               Browse Books
+            </Link>
+            <Link
+              to="/study-material"
+              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <Star className="w-5 h-5" />
+              AI Study · Take Notes
             </Link>
           </motion.div>
         </div>
@@ -331,6 +272,8 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+  
       {/* Features Section */}
       <section className="py-20 px-4">
         <div className="max-w-6xl mx-auto">
@@ -412,61 +355,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Live Stats Section */}
-      <section className="py-20 px-4">
-        <div className="max-w-6xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className={`text-4xl font-bold text-center mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
-          >
-            Live Campus Statistics
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            viewport={{ once: true }}
-            className={`text-center mb-12 max-w-2xl mx-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
-          >
-            Real-time data showing how CampusSync is helping students across the campus.
-          </motion.p>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard
-              icon={Package}
-              value={loadingStats ? null : stats.totalItems}
-              label="Items Reported"
-              color="bg-red-500"
-              isLoading={loadingStats}
-            />
-            <StatsCard
-              icon={CheckCircle}
-              value={loadingStats ? null : stats.itemsRecovered}
-              label="Items Recovered"
-              color="bg-green-500"
-              isLoading={loadingStats}
-            />
-            <StatsCard
-              icon={BookOpen}
-              value={loadingStats ? null : stats.booksSold}
-              label="Books Sold"
-              color="bg-blue-500"
-              isLoading={loadingStats}
-            />
-            <StatsCard
-              icon={Users}
-              value={loadingStats ? null : stats.activeUsers}
-              label="Active Users"
-              color="bg-purple-500"
-              isLoading={loadingStats}
-            />
-          </div>
-        </div>
-      </section>
+      
 
       {/* Book Marketplace Preview */}
       <section className={`py-20 px-4 ${isDarkMode ? 'bg-gray-800/30' : 'bg-gray-100/50'}`}>
@@ -514,6 +403,65 @@ const Home = () => {
           </motion.div>
         </div>
       </section>
+
+          <section className={`py-20 px-4 ${isDarkMode ? 'bg-gray-800/10' : 'bg-white/50'}`}>
+        <div className="max-w-6xl mx-auto">
+          <motion.h2
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className={`text-4xl font-bold text-center mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
+          >
+            What Students Say
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            viewport={{ once: true }}
+            className={`text-center mb-12 max-w-2xl mx-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+          >
+            Real students, real recoveries — CampusSync makes campus life easier.
+          </motion.p>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[{
+              name: 'Aisha R.',
+              role: '2nd Year, CS',
+              text: 'Found my lost laptop within hours — the matching feature is incredible!'
+            },{
+              name: 'Rohit K.',
+              role: '4th Year, Chemistry',
+              text: 'Sold my old textbooks quickly and safely through CampusSync.'
+            },{
+              name: 'Meera S.',
+              role: '1st Year, Arts',
+              text: 'The chat feature made coordinating pickup so smooth. Highly recommend.'
+            }].map((t, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 * i }}
+                viewport={{ once: true }}
+                className={`p-6 rounded-xl shadow-lg transition-all ${isDarkMode ? 'bg-gray-800/60 border border-gray-700' : 'bg-white/80 border border-gray-200'}`}
+              >
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold mr-4">{t.name.split(' ')[0].charAt(0)}</div>
+                  <div>
+                    <div className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t.name}</div>
+                    <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{t.role}</div>
+                  </div>
+                </div>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{t.text}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
 
       {/* Call to Action Section */}
       <section className="py-20 px-4">

@@ -14,8 +14,8 @@ const MessageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
       trim: true,
+      default: '',
     },
     messageType: {
       type: String,

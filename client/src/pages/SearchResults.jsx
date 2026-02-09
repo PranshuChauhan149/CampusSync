@@ -205,7 +205,10 @@ const SearchResults = () => {
                   className={`rounded-lg overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all ${
                     isDarkMode ? 'bg-gray-800' : 'bg-white'
                   }`}
-                  onClick={() => setSelectedItem(isBook ? { ...item, type: 'book' } : { ...item, type: 'item' })}
+                  onClick={() => {
+                    if (isBook) navigate(`/book/${item._id}`);
+                    else navigate(`/item/${item._id}`);
+                  }}
                 >
                   {/* Image */}
                   <div className="relative h-40 bg-gray-200 dark:bg-gray-700 overflow-hidden group">
@@ -241,7 +244,7 @@ const SearchResults = () => {
                             ? 'bg-blue-500'
                             : isFound
                             ? 'bg-green-500'
-                            : 'bg-purple-500'
+                              : 'bg-red-500'
                         }`}
                       >
                         {isBook ? 'Book' : isFound ? 'Found' : 'Lost'}
@@ -317,7 +320,10 @@ const SearchResults = () => {
                   className={`p-4 rounded-lg flex gap-4 cursor-pointer transition-all hover:shadow-md ${
                     isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:shadow-lg'
                   }`}
-                  onClick={() => setSelectedItem(isBook ? { ...item, type: 'book' } : { ...item, type: 'item' })}
+                  onClick={() => {
+                    if (isBook) navigate(`/book/${item._id}`);
+                    else navigate(`/item/${item._id}`);
+                  }}
                 >
                   {/* Image */}
                   <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-gray-700">
@@ -353,7 +359,7 @@ const SearchResults = () => {
                               ? 'bg-blue-500'
                               : isFound
                               ? 'bg-green-500'
-                              : 'bg-purple-500'
+                              : 'bg-red-500'
                           }`}>
                             {isBook ? 'Book' : isFound ? 'Found' : 'Lost'}
                           </span>

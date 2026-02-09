@@ -26,7 +26,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { itemsAPI, chatAPI, favoritesAPI } from '../services/api';
-import Navbar from '../components/Navbar';
+import ClaimModal from '../components/ClaimModal';
+
 import { toast } from 'react-toastify';
 
 const LostAndFound = () => {
@@ -43,7 +44,6 @@ const LostAndFound = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showClaimModal, setShowClaimModal] = useState(false);
-  const [claimSubmitting, setClaimSubmitting] = useState(false);
   const [claimItem, setClaimItem] = useState(null);
 
   // Filters and search
@@ -81,19 +81,7 @@ const LostAndFound = () => {
   const [imagePreviews, setImagePreviews] = useState([]);
   const fileInputRef = useRef(null);
   const [isFavorited, setIsFavorited] = useState(false);
-  const [claimForm, setClaimForm] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    location: '',
-    date: '',
-    description: '',
-    distinguishingFeatures: '',
-    message: ''
-  });
-  const [claimImages, setClaimImages] = useState([]);
-  const [claimImagePreviews, setClaimImagePreviews] = useState([]);
-  const claimFileInputRef = useRef(null);
+  
 
   // Categories for items
   const categories = [
@@ -120,23 +108,7 @@ const LostAndFound = () => {
     }
   }, [isAuthenticated, user]);
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      setClaimForm(prev => ({
-        ...prev,
-        fullName: user.username || prev.fullName,
-        email: user.email || prev.email
-      }));
-    }
-  }, [isAuthenticated, user]);
-
-  useEffect(() => {
-    return () => {
-      if (claimImagePreviews.length > 0) {
-        claimImagePreviews.forEach((url) => URL.revokeObjectURL(url));
-      }
-    };
-  }, [claimImagePreviews]);
+  
 
   const fetchItems = async () => {
     try {
@@ -282,25 +254,6 @@ const LostAndFound = () => {
     setSelectedImages([]);
     setImagePreviews([]);
   };
-
-  const resetClaimForm = () => {
-    setClaimForm({
-      fullName: user?.username || '',
-      email: user?.email || '',
-      phone: '',
-      location: '',
-      date: '',
-      description: '',
-      distinguishingFeatures: '',
-      message: ''
-    });
-    if (claimImagePreviews.length > 0) {
-      claimImagePreviews.forEach((url) => URL.revokeObjectURL(url));
-    }
-    setClaimImages([]);
-    setClaimImagePreviews([]);
-  };
-
   const openClaimModal = (item) => {
     if (!isAuthenticated) {
       toast.error('Please login to claim an item');
@@ -310,67 +263,8 @@ const LostAndFound = () => {
     setClaimItem(item);
     setShowClaimModal(true);
   };
-
-  const closeClaimModal = () => {
-    setShowClaimModal(false);
-    setClaimItem(null);
-    resetClaimForm();
-  };
-
-  const handleClaimChange = (e) => {
-    const { name, value } = e.target;
-    setClaimForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleClaimImages = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    if (claimImagePreviews.length > 0) {
-      claimImagePreviews.forEach((url) => URL.revokeObjectURL(url));
-    }
-
-    const previews = files.map((file) => URL.createObjectURL(file));
-    setClaimImages(files);
-    setClaimImagePreviews(previews);
-  };
-
-  const handleClaimSubmit = async (e) => {
-    e.preventDefault();
-    if (!claimItem) return;
-
-    if (!claimForm.fullName || !claimForm.email || !claimForm.location || !claimForm.date || !claimForm.description) {
-      toast.error('Please fill all required claim details');
-      return;
-    }
-
-    try {
-      setClaimSubmitting(true);
-      const submitData = new FormData();
-      submitData.append('fullName', claimForm.fullName.trim());
-      submitData.append('email', claimForm.email.trim());
-      submitData.append('phone', claimForm.phone.trim());
-      submitData.append('location', claimForm.location.trim());
-      submitData.append('date', claimForm.date);
-      submitData.append('description', claimForm.description.trim());
-      submitData.append('distinguishingFeatures', claimForm.distinguishingFeatures.trim());
-      submitData.append('message', claimForm.message.trim());
-
-      if (claimImages.length > 0) {
-        claimImages.forEach((file) => submitData.append('claimImages', file));
-      }
-
-      await itemsAPI.claimItem(claimItem._id, submitData);
-      toast.success('Claim request submitted! The owner will review your details.');
-      setShowItemModal(false);
-      closeClaimModal();
-    } catch (error) {
-      console.error('Failed to submit claim:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit claim');
-    } finally {
-      setClaimSubmitting(false);
-    }
-  };
+  
+  
 
   const handleMessageOwner = async (ownerId) => {
     if (!isAuthenticated) {
@@ -445,23 +339,36 @@ const LostAndFound = () => {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
-      isDarkMode ? 'bg-gray-900' : 'bg-gray-50'
+      isDarkMode 
+        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
+        : 'bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50'
     }`}>
-      
+     
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="text-center mb-12"
         >
-          <h1 className={`text-4xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            Lost & Found
-          </h1>
-          <p className={`text-lg max-w-2xl mx-auto ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Help reunite lost items with their owners or report items you've found.
-            Together, we can make our campus community better.
+          <motion.div
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <h1 className={`text-5xl sm:text-6xl font-extrabold mb-4 bg-clip-text text-transparent ${
+              isDarkMode
+                ? 'bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400'
+                : 'bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600'
+            }`}>
+              Lost & Found
+            </h1>
+          </motion.div>
+          <p className={`text-lg sm:text-xl max-w-2xl mx-auto ${
+            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+          }`}>
+            🔍 Help reunite people with their belongings on campus
           </p>
         </motion.div>
 
@@ -572,18 +479,33 @@ const LostAndFound = () => {
 
         {/* Items Grid */}
         {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array(6).fill(0).map((_, index) => (
-              <div key={index} className={`rounded-xl border p-6 ${
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array(8).fill(0).map((_, index) => (
+              <div key={index} className={`rounded-2xl border overflow-hidden shadow-lg ${
                 isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
               }`}>
                 <div className="animate-pulse">
-                  <div className="h-48 bg-gray-300 dark:bg-gray-600 rounded-lg mb-4"></div>
-                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4 mb-4"></div>
-                  <div className="flex gap-2">
-                    <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
-                    <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                  <div className={`h-52 ${
+                    isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                  }`}></div>
+                  <div className="p-5 space-y-3">
+                    <div className={`h-5 rounded-lg ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                    }`}></div>
+                    <div className={`h-4 rounded w-3/4 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                    }`}></div>
+                    <div className={`h-4 rounded w-1/2 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                    }`}></div>
+                    <div className="flex gap-2 pt-2">
+                      <div className={`h-6 rounded w-20 ${
+                        isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                      }`}></div>
+                      <div className={`h-6 rounded w-16 ${
+                        isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                      }`}></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -607,97 +529,152 @@ const LostAndFound = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           >
             {items.map((item, index) => (
               <motion.div
                 key={item._id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ scale: 1.02, y: -5 }}
-                className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-300 ${
-                  isDarkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-800/80' : 'bg-white border-gray-200 hover:bg-white/80'
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ y: -8, scale: 1.02 }}
+                className={`group rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 shadow-lg hover:shadow-2xl ${
+                  isDarkMode 
+                    ? 'bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50' 
+                    : 'bg-white border border-gray-200/50'
                 }`}
-                onClick={() => {
-                  setSelectedItem(item);
-                  checkIfFavorited(item._id);
-                  setShowItemModal(true);
-                }}
+                onClick={() => navigate(`/item/${item._id}`)}
               >
                 {/* Item Image */}
-                <div className="aspect-w-16 aspect-h-12 bg-gray-200 dark:bg-gray-700 relative">
+                <div className="relative overflow-hidden">
                   {item.images && item.images.length > 0 ? (
-                    <img
-                      src={item.images[0]}
-                      alt={item.title}
-                      className="w-full h-48 object-cover"
-                    />
+                    <div className="relative h-52 overflow-hidden">
+                      <img
+                        src={item.images[0]}
+                        alt={item.title}
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    </div>
                   ) : (
-                    <div className="w-full h-48 flex items-center justify-center">
-                      <ImageIcon className="w-12 h-12 text-gray-400" />
+                    <div className={`h-52 flex items-center justify-center ${
+                      isDarkMode 
+                        ? 'bg-gradient-to-br from-gray-700 to-gray-800' 
+                        : 'bg-gradient-to-br from-gray-100 to-gray-200'
+                    }`}>
+                      <ImageIcon className="w-16 h-16 text-gray-400" />
                     </div>
                   )}
 
-                  {/* Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(item.type)}`}>
-                      {item.type.toUpperCase()}
+                  {/* Badges */}
+                  <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
+                    <motion.span 
+                      whileHover={{ scale: 1.1 }}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-full shadow-lg backdrop-blur-sm ${
+                        item.type === 'lost'
+                          ? 'bg-red-500/90 text-white'
+                          : 'bg-green-500/90 text-white'
+                      }`}
+                    >
+                      {item.type === 'lost' ? '🔍 LOST' : '✓ FOUND'}
+                    </motion.span>
+                    
+                    <span className={`px-3 py-1.5 text-xs font-semibold rounded-full shadow-lg backdrop-blur-sm ${
+                      item.status === 'active'
+                        ? 'bg-blue-500/90 text-white'
+                        : item.status === 'claimed'
+                        ? 'bg-purple-500/90 text-white'
+                        : 'bg-gray-500/90 text-white'
+                    }`}>
+                      {item.status.toUpperCase()}
                     </span>
                   </div>
 
-                  {/* Status Badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                      {item.status.toUpperCase()}
-                    </span>
+                  {/* Views Counter */}
+                  <div className="absolute bottom-3 right-3">
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs">
+                      <Eye className="w-3 h-3" />
+                      <span>{item.views || 0}</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Item Details */}
-                <div className="p-4">
-                  <h3 className={`font-semibold text-lg mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    {item.title}
-                  </h3>
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h3 className={`font-bold text-lg line-clamp-1 flex-1 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      {item.title}
+                    </h3>
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg capitalize shrink-0 ${
+                      isDarkMode
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {item.category}
+                    </span>
+                  </div>
 
-                  <p className={`text-sm mb-3 line-clamp-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <p className={`text-sm mb-4 line-clamp-2 leading-relaxed ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
                     {item.description}
                   </p>
 
-                  <div className="flex items-center justify-between text-sm mb-3">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4 text-gray-500" />
-                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                        {item.location}
-                      </span>
+                  {/* Location and Date */}
+                  <div className="space-y-2 mb-4">
+                    <div className={`flex items-center gap-2 text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      <MapPin className={`w-4 h-4 shrink-0 ${
+                        isDarkMode ? 'text-blue-400' : 'text-blue-500'
+                      }`} />
+                      <span className="line-clamp-1">{item.location}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                        {new Date(item.date).toLocaleDateString()}
-                      </span>
+                    <div className={`flex items-center gap-2 text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      <Calendar className={`w-4 h-4 shrink-0 ${
+                        isDarkMode ? 'text-purple-400' : 'text-purple-500'
+                      }`} />
+                      <span>{new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm font-medium px-2 py-1 rounded ${getTypeColor(item.category)}`}>
-                      {item.category}
-                    </span>
+                  {/* Action Button */}
+                  {item.status === 'active' && isAuthenticated && item.reportedBy?._id !== user?._id && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openClaimModal(item);
+                      }}
+                      className="w-full py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Claim Item
+                    </motion.button>
+                  )}
 
-                    {item.status === 'active' && isAuthenticated && item.reportedBy?._id !== user?._id && (
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openClaimModal(item);
-                        }}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
-                      >
-                        Claim Item
-                      </motion.button>
-                    )}
-                  </div>
+                  {/* Tags */}
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {item.tags.slice(0, 3).map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className={`px-2 py-0.5 text-xs rounded-full ${
+                            isDarkMode
+                              ? 'bg-gray-700 text-gray-300'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -1025,292 +1002,8 @@ const LostAndFound = () => {
           )}
         </AnimatePresence>
 
-        {/* Claim Request Modal */}
-        <AnimatePresence>
-          {showClaimModal && claimItem && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-              onClick={closeClaimModal}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl ${
-                  isDarkMode ? 'bg-gray-800' : 'bg-white'
-                }`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        Claim Item
-                      </h2>
-                      <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Provide proof and details to verify your claim.
-                      </p>
-                    </div>
-                    <button
-                      onClick={closeClaimModal}
-                      className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-6 space-y-6">
-                  <div className={`rounded-lg border p-4 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {claimItem.title}
-                        </h3>
-                        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {claimItem.category} • {new Date(claimItem.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span className={`text-xs font-medium px-2 py-1 rounded ${getTypeColor(claimItem.type)}`}>
-                        {claimItem.type.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleClaimSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          name="fullName"
-                          value={claimForm.fullName}
-                          onChange={handleClaimChange}
-                          className={`w-full px-4 py-2 rounded-lg border ${
-                            isDarkMode
-                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                          } focus:outline-none focus:border-blue-500`}
-                          placeholder="Your full name"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={claimForm.email}
-                          onChange={handleClaimChange}
-                          className={`w-full px-4 py-2 rounded-lg border ${
-                            isDarkMode
-                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                          } focus:outline-none focus:border-blue-500`}
-                          placeholder="you@example.com"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          Phone
-                        </label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={claimForm.phone}
-                          onChange={handleClaimChange}
-                          className={`w-full px-4 py-2 rounded-lg border ${
-                            isDarkMode
-                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                          } focus:outline-none focus:border-blue-500`}
-                          placeholder="Optional"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          Location *
-                        </label>
-                        <input
-                          type="text"
-                          name="location"
-                          value={claimForm.location}
-                          onChange={handleClaimChange}
-                          className={`w-full px-4 py-2 rounded-lg border ${
-                            isDarkMode
-                              ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                              : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                          } focus:outline-none focus:border-blue-500`}
-                          placeholder="Where did you lose/find it?"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          Date *
-                        </label>
-                        <input
-                          type="date"
-                          name="date"
-                          value={claimForm.date}
-                          onChange={handleClaimChange}
-                          className={`w-full px-4 py-2 rounded-lg border ${
-                            isDarkMode
-                              ? 'bg-gray-700 border-gray-600 text-white'
-                              : 'bg-white border-gray-300 text-gray-900'
-                          } focus:outline-none focus:border-blue-500`}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Description *
-                      </label>
-                      <textarea
-                        name="description"
-                        value={claimForm.description}
-                        onChange={handleClaimChange}
-                        rows={4}
-                        className={`w-full px-4 py-2 rounded-lg border ${
-                          isDarkMode
-                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                        } focus:outline-none focus:border-blue-500`}
-                        placeholder="Describe the item and why you believe it is yours."
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Distinguishing Features
-                      </label>
-                      <textarea
-                        name="distinguishingFeatures"
-                        value={claimForm.distinguishingFeatures}
-                        onChange={handleClaimChange}
-                        rows={3}
-                        className={`w-full px-4 py-2 rounded-lg border ${
-                          isDarkMode
-                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                        } focus:outline-none focus:border-blue-500`}
-                        placeholder="Unique marks, serial numbers, stickers, etc."
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Message to Owner
-                      </label>
-                      <textarea
-                        name="message"
-                        value={claimForm.message}
-                        onChange={handleClaimChange}
-                        rows={3}
-                        className={`w-full px-4 py-2 rounded-lg border ${
-                          isDarkMode
-                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                        } focus:outline-none focus:border-blue-500`}
-                        placeholder="Optional note for the person who posted this item."
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                        Upload Proof Images
-                      </label>
-                      <div className="space-y-3">
-                        <input
-                          ref={claimFileInputRef}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleClaimImages}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => claimFileInputRef.current?.click()}
-                          className={`w-full py-3 px-4 rounded-lg border-2 border-dashed transition-colors ${
-                            isDarkMode
-                              ? 'border-gray-600 text-gray-300 hover:border-blue-500'
-                              : 'border-gray-300 text-gray-700 hover:border-blue-500'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center gap-2">
-                            <Upload className="w-4 h-4" />
-                            Add Images
-                          </div>
-                        </button>
-                        {claimImagePreviews.length > 0 && (
-                          <div className="grid grid-cols-3 gap-3">
-                            {claimImagePreviews.map((preview, index) => (
-                              <div key={preview} className="relative">
-                                <img
-                                  src={preview}
-                                  alt={`claim-${index}`}
-                                  className="w-full h-24 object-cover rounded-lg"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updatedImages = claimImages.filter((_, i) => i !== index);
-                                    const updatedPreviews = claimImagePreviews.filter((_, i) => i !== index);
-                                    URL.revokeObjectURL(claimImagePreviews[index]);
-                                    setClaimImages(updatedImages);
-                                    setClaimImagePreviews(updatedPreviews);
-                                  }}
-                                  className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4 pt-2">
-                      <button
-                        type="button"
-                        onClick={closeClaimModal}
-                        className={`flex-1 py-3 px-6 rounded-lg border transition-colors ${
-                          isDarkMode
-                            ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
-                            : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={claimSubmitting}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {claimSubmitting ? 'Submitting...' : 'Submit Claim'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Claim Request Modal (extracted) */}
+        <ClaimModal isOpen={showClaimModal} item={claimItem} onClose={() => { setShowClaimModal(false); setClaimItem(null); }} />
 
         {/* Item Detail Modal */}
         <AnimatePresence>

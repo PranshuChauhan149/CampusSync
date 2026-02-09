@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send,
@@ -21,6 +22,7 @@ import io from 'socket.io-client';
 const Chat = () => {
   const { user, isAuthenticated } = useAuth();
   const { isDarkMode } = useTheme();
+  const location = useLocation();
   
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -43,6 +45,7 @@ const Chat = () => {
   const typingTimeoutRef = useRef(null);
   const selectedConversationRef = useRef(null);
   const fileInputRef = useRef(null);
+  const messageInputRef = useRef(null);
 
   useEffect(() => {
     selectedConversationRef.current = selectedConversation;
@@ -62,7 +65,6 @@ const Chat = () => {
 
     const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
     const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, '');
-    console.log(`🔌 Connecting to Socket.io at ${SOCKET_URL}`);
     
     socket.current = io(SOCKET_URL, {
       auth: {
@@ -72,23 +74,18 @@ const Chat = () => {
     });
 
     socket.current.on('connect', () => {
-      console.log('✅ Socket.io connected:', socket.current.id);
       socket.current.emit('join', user._id);
-      console.log(`👤 Emitted join event for user: ${user._id}`);
     });
 
     socket.current.on('user-online', (data) => {
-      console.log(`📡 User online: ${data.userId}`);
       setOnlineUsers(prev => new Set([...prev, data.userId]));
     });
 
     socket.current.on('online-users', (userIds) => {
-      console.log('📡 Online users list received:', userIds);
       setOnlineUsers(new Set(userIds));
     });
 
     socket.current.on('user-offline', (data) => {
-      console.log(`📡 User offline: ${data.userId}`);
       setOnlineUsers(prev => {
         const updated = new Set(prev);
         updated.delete(data.userId);
@@ -97,9 +94,7 @@ const Chat = () => {
     });
 
     socket.current.on('receive-message', (data) => {
-      console.log(`💬 Message received on socket:`, data);
       if (selectedConversationRef.current?._id === data.conversationId) {
-        console.log(`✅ Adding message to current conversation`);
         setMessages(prev => [...prev, data.message]);
         scrollToBottom();
       }
@@ -108,9 +103,7 @@ const Chat = () => {
     });
 
     socket.current.on('new-message', (data) => {
-      console.log(`📨 New message event received:`, data);
       if (selectedConversationRef.current?._id === data.conversationId) {
-        console.log(`✅ Adding new message to current conversation`);
         setMessages(prev => [...prev, data.message]);
         scrollToBottom();
       }
@@ -119,23 +112,18 @@ const Chat = () => {
     });
 
     socket.current.on('user-typing', (data) => {
-      console.log(`⌨️  User typing: ${data.username}`);
       if (selectedConversation?.participants.some(p => p._id === data.userId)) {
         setTypingUsers(prev => [...new Set([...prev, data.userId])]);
       }
     });
 
     socket.current.on('user-stop-typing', (data) => {
-      console.log(`⏸️  User stopped typing: ${data.userId}`);
       setTypingUsers(prev => prev.filter(id => id !== data.userId));
     });
 
-    socket.current.on('disconnect', () => {
-      console.log('❌ Socket.io disconnected');
-    });
+    socket.current.on('disconnect', () => {});
 
     return () => {
-      console.log('🧹 Cleaning up socket connection');
       socket.current?.disconnect();
     };
   }, [isAuthenticated, user]);
@@ -160,6 +148,27 @@ const Chat = () => {
     }
   }, [isAuthenticated]);
 
+  // If navigated here with a conversationId, select it once conversations are loaded
+  useEffect(() => {
+    const convId = location.state?.conversationId;
+    if (convId && conversations.length > 0) {
+      const found = conversations.find(c => c._id === convId || c._id === convId?.toString());
+      if (found) {
+        setSelectedConversation(found);
+      }
+    }
+  }, [conversations, location.state]);
+
+  // autofocus message input when a conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      setTimeout(() => {
+        messageInputRef.current?.focus();
+        scrollToBottom();
+      }, 150);
+    }
+  }, [selectedConversation]);
+
   // Fetch messages for selected conversation
   useEffect(() => {
     if (!selectedConversation) return;
@@ -167,19 +176,15 @@ const Chat = () => {
 
     const fetchMessages = async () => {
       try {
-        console.log(`\n💬 Loading messages for conversation: ${conversationId}`);
         setMessageLoading(true);
         const response = await chatAPI.getMessages(conversationId, { page: 1, limit: 50 });
-        console.log(`✅ Loaded ${response.data.data.length} messages`);
         setMessages(response.data.data);
         scrollToBottom();
 
         // Join conversation room for real-time updates
-        console.log(`🔗 Joining conversation Socket.io room: conversation-${conversationId}`);
         socket.current?.emit('join-conversation', conversationId);
 
         // Mark all messages as read
-        console.log(`✅ Marking messages as read`);
         await chatAPI.markAsRead(conversationId);
       } catch (error) {
         console.error('❌ Failed to fetch messages:', error);
@@ -192,7 +197,6 @@ const Chat = () => {
     fetchMessages();
     return () => {
       if (conversationId) {
-        console.log(`🚪 Leaving conversation room: conversation-${conversationId}`);
         socket.current?.emit('leave-conversation', conversationId);
       }
     };
@@ -236,8 +240,6 @@ const Chat = () => {
     if (!newMessage.trim() && !pendingImage) return;
 
     const messageContent = newMessage.trim();
-    console.log(`\n📨 Sending message in conversation: ${selectedConversation._id}`);
-    console.log(`   Content: ${messageContent.substring(0, 50)}...`);
 
     try {
       const formData = new FormData();
@@ -246,8 +248,6 @@ const Chat = () => {
         formData.append('image', pendingImage);
       }
       const response = await chatAPI.sendMessage(selectedConversation._id, formData);
-
-      console.log(`✅ Message saved to database:`, response.data.data);
       setMessages(prev => [...prev, response.data.data]);
       setNewMessage('');
       if (pendingImagePreview) {
@@ -258,7 +258,6 @@ const Chat = () => {
       scrollToBottom();
 
       // Emit via socket to notify other users in real-time
-      console.log(`📡 Emitting send-message to socket for real-time delivery`);
       socket.current?.emit('send-message', {
         conversationId: selectedConversation._id,
         message: response.data.data,
@@ -305,6 +304,20 @@ const Chat = () => {
   // Get other participant info
   const getOtherParticipant = (conversation) => {
     return conversation.participants.find(p => p._id !== user._id);
+  };
+
+  const formatTime = (iso) => {
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      if (sameDay) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return d.toLocaleDateString();
+    } catch (e) {
+      return '';
+    }
   };
 
   if (!isAuthenticated) {
@@ -408,14 +421,23 @@ const Chat = () => {
                   <Loader className="w-6 h-6 text-blue-400 animate-spin" />
                 </div>
               ) : conversations.length === 0 ? (
-                <div className={`flex items-center justify-center h-full ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`flex flex-col items-center justify-center h-full gap-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   <p>No conversations yet</p>
+                  <button
+                    onClick={() => setShowNewChat(true)}
+                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg"
+                  >
+                    Start a conversation
+                  </button>
                 </div>
               ) : (
                 conversations.map((conv) => {
                   const other = getOtherParticipant(conv);
                   const isOnline = onlineUsers.has(other?._id);
                   const isSelected = selectedConversation?._id === conv._id;
+                  const unread = conv.unreadCount || (conv.unread && conv.unread.length) || 0;
+
+                  const avatarInitial = other?.username ? other.username.charAt(0).toUpperCase() : '?';
 
                   return (
                     <motion.button
@@ -434,16 +456,22 @@ const Chat = () => {
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full"></div>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-white`} style={{background: 'linear-gradient(135deg,#60a5fa,#a78bfa)'}}>
+                            {avatarInitial}
+                          </div>
                           {isOnline && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2" style={{borderColor: isDarkMode ? '#111827' : '#fff'}}></div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-white truncate">
-                            {other?.username}
-                          </p>
-                          <p className="text-sm text-gray-400 truncate">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold truncate" style={{color: isDarkMode ? '#fff' : '#111827'}}>{other?.username}</p>
+                            {unread > 0 && (
+                              <span className="text-xs bg-red-500 text-white rounded-full px-2 py-0.5">{unread}</span>
+                            )}
+                            <span className="ml-auto text-xs text-gray-400">{conv.lastMessage?._id ? formatTime(conv.lastMessage.createdAt) : ''}</span>
+                          </div>
+                          <p className={`text-sm truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                             {conv.lastMessage?.content || 'No messages yet'}
                           </p>
                         </div>
@@ -489,19 +517,41 @@ const Chat = () => {
                   {(() => {
                     const otherUser = getOtherParticipant(selectedConversation);
                     const phone = otherUser?.phone;
+                    if (phone) {
+                      return (
+                        <a
+                          href={`tel:${phone}`}
+                          aria-label={`Call ${otherUser.username}`}
+                          className={`p-2 rounded-lg transition ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                        >
+                          <Phone className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                        </a>
+                      );
+                    }
+
+                    // Fallback: open mailto if phone not available
+                    const email = otherUser?.email;
+                    if (email) {
+                      return (
+                        <a
+                          href={`mailto:${email}`}
+                          aria-label={`Email ${otherUser.username}`}
+                          className={`p-2 rounded-lg transition ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                        >
+                          <Phone className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                        </a>
+                      );
+                    }
+
                     return (
-                      <a
-                        href={phone ? `tel:${phone}` : undefined}
-                        onClick={(e) => {
-                          if (!phone) {
-                            e.preventDefault();
-                            toast.info('User phone number not available');
-                          }
-                        }}
-                        className={`p-2 rounded-lg transition ${phone ? (isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200') : 'opacity-50 cursor-not-allowed'}`}
+                      <button
+                        type="button"
+                        onClick={() => toast.info('Contact details not available')}
+                        className="p-2 rounded-lg opacity-50 cursor-not-allowed"
+                        aria-label="Contact not available"
                       >
                         <Phone className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                      </a>
+                      </button>
                     );
                   })()}
                 </div>
@@ -524,7 +574,7 @@ const Chat = () => {
                       }`}
                     >
                       <div
-                        className={`max-w-xs px-4 py-2 rounded-lg ${
+                        className={`max-w-[70%] md:max-w-xs px-4 py-2 rounded-lg ${
                           msg.sender._id === user._id
                             ? 'bg-blue-600 text-white'
                             : isDarkMode
@@ -540,15 +590,8 @@ const Chat = () => {
                           />
                         ) : null}
                         {msg.content ? <p className="text-white font-semibold">{msg.content}</p> : null}
-                        <p className={`text-xs mt-1 ${
-                          msg.sender._id === user._id
-                            ? 'text-blue-100'
-                            : 'text-gray-100'
-                        }`}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <p className={`text-xs mt-1 ${msg.sender._id === user._id ? 'text-blue-100' : 'text-gray-100'}`}>
+                          {formatTime(msg.createdAt)}
                         </p>
                       </div>
                     </motion.div>
@@ -629,15 +672,26 @@ const Chat = () => {
                     </div>
                   </div>
                 )}
-                <input
-                  type="text"
+                <textarea
+                  ref={messageInputRef}
                   value={newMessage}
                   onChange={(e) => {
                     setNewMessage(e.target.value);
                     handleTyping();
                   }}
-                  placeholder="Type a message..."
-                  className={`flex-1 px-4 py-2 rounded-lg border ${
+                  onInput={(e) => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage(e);
+                    }
+                  }}
+                  rows={1}
+                  placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
+                  className={`flex-1 px-4 py-2 rounded-lg border resize-none overflow-hidden ${
                     isDarkMode
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'

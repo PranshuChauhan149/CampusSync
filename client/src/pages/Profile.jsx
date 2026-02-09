@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -50,6 +50,9 @@ const Profile = () => {
     location: '',
     bio: ''
   });
+  const fileInputRef = useRef(null);
+  const [pendingProfileImage, setPendingProfileImage] = useState(null);
+  const [pendingProfilePreview, setPendingProfilePreview] = useState('');
 
   const [myItems, setMyItems] = useState([]);
   const [myBooks, setMyBooks] = useState([]);
@@ -65,7 +68,17 @@ const Profile = () => {
     status: 'active',
     date: ''
   });
+  const [editingBook, setEditingBook] = useState(null);
+  const [editBookForm, setEditBookForm] = useState({
+    title: '',
+    author: '',
+    price: '',
+    condition: 'good',
+    status: 'available',
+    description: ''
+  });
   const [isSavingItem, setIsSavingItem] = useState(false);
+  const [isSavingBook, setIsSavingBook] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState(null);
 
   useEffect(() => {
@@ -77,24 +90,25 @@ const Profile = () => {
         location: user.location || '',
         bio: user.bio || ''
       });
+      if (user.profilePicture) {
+        setPendingProfilePreview(user.profilePicture);
+      }
     }
   }, [user]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log('👤 User authenticated, fetching data...');
       fetchUserData();
     }
   }, [isAuthenticated, user]);
 
   const fetchUserData = async () => {
     if (!isAuthenticated) {
-      console.log('User not authenticated, skipping data fetch');
       return;
     }
 
     try {
-      console.log('📊 Fetching user data...');
+      
       setLoading(true);
       
       const [itemsRes, booksRes, statsRes] = await Promise.all([
@@ -112,9 +126,7 @@ const Profile = () => {
         })
       ]);
 
-      console.log('✅ Items response:', itemsRes.data);
-      console.log('✅ Books response:', booksRes.data);
-      console.log('✅ Stats response:', statsRes.data);
+      
 
       const items = itemsRes.data.data || [];
       const books = booksRes.data.data || [];
@@ -131,12 +143,7 @@ const Profile = () => {
         activeConversations: 0
       });
 
-      console.log('✅ Stats updated:', {
-        itemsPosted: items.length,
-        booksListed: books.length,
-        itemsClaimed: items.filter(item => item.status === 'claimed').length,
-        itemsRecovered: userStats.itemsRecovered
-      });
+      
     } catch (error) {
       console.error('❌ Error fetching user data:', error);
       toast.error('Failed to load profile data');
@@ -154,12 +161,23 @@ const Profile = () => {
 
   const handleSaveProfile = async () => {
     try {
-      console.log('💾 Saving profile...', formData);
+      
       setLoading(true);
-      const response = await authAPI.updateProfile(formData);
-      console.log('✅ Profile updated:', response.data);
+      let response;
+      if (pendingProfileImage) {
+        const fd = new FormData();
+        fd.append('username', formData.username);
+        fd.append('phone', formData.phone);
+        fd.append('location', formData.location);
+        fd.append('bio', formData.bio);
+        fd.append('profilePicture', pendingProfileImage);
+        response = await authAPI.updateProfile(fd);
+      } else {
+        response = await authAPI.updateProfile(formData);
+      }
+      
       setUser(response.data.data);
-      toast.success('Profile updated successfully!');
+      toast.success(response.data.message || 'Profile updated successfully!');
       setIsEditing(false);
     } catch (error) {
       console.error('❌ Error updating profile:', error);
@@ -178,6 +196,22 @@ const Profile = () => {
       bio: user.bio || ''
     });
     setIsEditing(false);
+    if (pendingProfilePreview && pendingProfilePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(pendingProfilePreview);
+    }
+    setPendingProfileImage(null);
+    setPendingProfilePreview(user.profilePicture || '');
+  };
+
+  const handleProfileImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (pendingProfilePreview && pendingProfilePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(pendingProfilePreview);
+    }
+    const url = URL.createObjectURL(file);
+    setPendingProfileImage(file);
+    setPendingProfilePreview(url);
   };
 
   const openEditItem = (item) => {
@@ -191,6 +225,63 @@ const Profile = () => {
       status: item.status || 'active',
       date: item.date ? new Date(item.date).toISOString().split('T')[0] : ''
     });
+  };
+
+  const openEditBook = (book) => {
+    setEditingBook(book);
+    setEditBookForm({
+      title: book.title || '',
+      author: book.author || '',
+      price: book.price || '',
+      condition: book.condition || 'good',
+      status: book.status || 'available',
+      description: book.description || ''
+    });
+  };
+
+  const handleEditBookInputChange = (e) => {
+    setEditBookForm({
+      ...editBookForm,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleUpdateBook = async () => {
+    if (!editingBook) return;
+    try {
+      setIsSavingBook(true);
+      const payload = {
+        title: editBookForm.title,
+        author: editBookForm.author,
+        price: editBookForm.price,
+        condition: editBookForm.condition,
+        status: editBookForm.status,
+        description: editBookForm.description
+      };
+      const response = await booksAPI.updateBook(editingBook._id, payload);
+      const updated = response.data?.data || response.data?.book || null;
+      if (updated) {
+        setMyBooks(prev => prev.map(b => b._id === updated._id ? updated : b));
+      }
+      toast.success(response.data?.message || 'Book updated successfully');
+      setEditingBook(null);
+    } catch (error) {
+      console.error('❌ Error updating book:', error);
+      toast.error(error.response?.data?.message || 'Failed to update book');
+    } finally {
+      setIsSavingBook(false);
+    }
+  };
+
+  const handleDeleteBook = async (bookId) => {
+    try {
+      await booksAPI.deleteBook(bookId);
+      setMyBooks(prev => prev.filter(b => b._id !== bookId));
+      toast.success('Book deleted successfully');
+    } catch (error) {
+      console.error('❌ Error deleting book:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete book');
+    }
   };
 
   const handleEditInputChange = (e) => {
@@ -306,14 +397,28 @@ const Profile = () => {
             <div className="flex flex-col md:flex-row items-center gap-6">
               {/* Profile Picture */}
               <div className="relative">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white text-5xl font-bold shadow-lg">
-                  {user?.username?.charAt(0).toUpperCase() || 'U'}
+                <div className="w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center text-white text-5xl font-bold shadow-lg">
+                  {pendingProfilePreview ? (
+                    <img src={pendingProfilePreview} alt="profile" className="w-full h-full object-cover" />
+                  ) : (
+                    (user?.username?.charAt(0).toUpperCase() || 'U')
+                  )}
                 </div>
-                <button
-                  className="absolute bottom-0 right-0 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:scale-110 transition-transform"
-                >
-                  <Camera className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProfileImageChange}
+                />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:scale-110 transition-transform"
+                    title="Change profile picture"
+                  >
+                    <Camera className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                  </button>
                 {user?.isVerified && (
                   <div className="absolute -top-2 -right-2 bg-green-500 p-1 rounded-full">
                     <CheckCircle className="w-6 h-6 text-white" />
@@ -326,7 +431,22 @@ const Profile = () => {
                 <h1 className="text-4xl font-bold text-white mb-2">
                   {user?.username}
                 </h1>
-                <p className="text-white/80 mb-4">{user?.email}</p>
+                <p className="text-white/80 mb-2">{user?.email}</p>
+                <div className="flex flex-wrap gap-3 items-center justify-center md:justify-start text-white/90">
+                  {user?.phone && (
+                    <span className="flex items-center gap-2 text-sm">
+                      <Phone className="w-4 h-4" /> {user.phone}
+                    </span>
+                  )}
+                  {user?.location && (
+                    <span className="flex items-center gap-2 text-sm">
+                      <MapPin className="w-4 h-4" /> {user.location}
+                    </span>
+                  )}
+                </div>
+                {user?.bio && (
+                  <p className="text-white/80 mt-3 max-w-2xl">{user.bio}</p>
+                )}
                 <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                   {user?.isVerified && (
                     <span className="px-4 py-1 bg-green-500/20 text-green-100 rounded-full text-sm font-medium backdrop-blur-sm">
@@ -345,6 +465,7 @@ const Profile = () => {
               <div>
                 {!isEditing ? (
                   <button
+                    type="button"
                     onClick={() => setIsEditing(true)}
                     className="px-6 py-3 bg-white text-purple-600 rounded-xl font-semibold hover:scale-105 transition-all shadow-lg"
                   >
@@ -354,6 +475,7 @@ const Profile = () => {
                 ) : (
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={handleSaveProfile}
                       disabled={loading}
                       className="px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:scale-105 transition-all shadow-lg disabled:opacity-50"
@@ -362,6 +484,7 @@ const Profile = () => {
                       Save
                     </button>
                     <button
+                      type="button"
                       onClick={handleCancel}
                       className="px-6 py-3 bg-red-500 text-white rounded-xl font-semibold hover:scale-105 transition-all shadow-lg"
                     >
@@ -919,6 +1042,124 @@ const Profile = () => {
                     </div>
                   </div>
                 )}
+                {editingBook && (
+                  <div className="fixed inset-0 z-50 overflow-auto flex items-center justify-center bg-black/60 p-4">
+                    <div className={`w-full max-w-full sm:max-w-2xl rounded-2xl shadow-2xl ${
+                      isDarkMode ? 'bg-gray-900' : 'bg-white'
+                    } mx-2`}> 
+                      <div className="flex items-center justify-between p-5 border-b border-gray-700">
+                        <h3 className={`text-lg font-semibold ${
+                          isDarkMode ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          Edit Book
+                        </h3>
+                        <button onClick={() => setEditingBook(null)}>
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Title</label>
+                          <input
+                            name="title"
+                            value={editBookForm.title}
+                            onChange={handleEditBookInputChange}
+                            className={`w-full mt-1 px-4 py-2 rounded-lg border ${
+                              isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200'
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Author</label>
+                          <input
+                            name="author"
+                            value={editBookForm.author}
+                            onChange={handleEditBookInputChange}
+                            className={`w-full mt-1 px-4 py-2 rounded-lg border ${
+                              isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200'
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Price</label>
+                          <input
+                            name="price"
+                            value={editBookForm.price}
+                            onChange={handleEditBookInputChange}
+                            className={`w-full mt-1 px-4 py-2 rounded-lg border ${
+                              isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200'
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Condition</label>
+                          <select
+                            name="condition"
+                            value={editBookForm.condition}
+                            onChange={handleEditBookInputChange}
+                            className={`w-full mt-1 px-4 py-2 rounded-lg border ${
+                              isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            <option value="new">New</option>
+                            <option value="good">Good</option>
+                            <option value="fair">Fair</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Status</label>
+                          <select
+                            name="status"
+                            value={editBookForm.status}
+                            onChange={handleEditBookInputChange}
+                            className={`w-full mt-1 px-4 py-2 rounded-lg border ${
+                              isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200'
+                            }`}
+                          >
+                            <option value="available">Available</option>
+                            <option value="sold">Sold</option>
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Description</label>
+                          <textarea
+                            name="description"
+                            rows="3"
+                            value={editBookForm.description}
+                            onChange={handleEditBookInputChange}
+                            className={`w-full mt-1 px-4 py-2 rounded-lg border ${
+                              isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-5 border-t border-gray-700 flex justify-end gap-3">
+                        <button
+                          onClick={() => setEditingBook(null)}
+                          className={`px-4 py-2 rounded-lg ${
+                            isDarkMode ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleUpdateBook}
+                          disabled={isSavingBook}
+                          className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                        >
+                          {isSavingBook ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -973,6 +1214,21 @@ const Profile = () => {
                         }`}>
                           {book.status}
                         </span>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditBook(book)}
+                          className="flex-1 py-2 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBook(book._id)}
+                          className="flex-1 py-2 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
