@@ -20,12 +20,13 @@
       "dest": "server/index.js"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "client/dist/assets/$1"
+      "src": "/assets/(?<path>.*)",
+      "dest": "client/dist/assets/$path"
     },
     {
-      "src": "/.*",
-      "dest": "client/dist/index.html"
+      "src": "/(.*)",
+      "dest": "client/dist/index.html",
+      "status": 200
     }
   ]
 }
