@@ -1,0 +1,9 @@
+packages:
+  - 'frontend'
+  - 'backend'
+allowBuilds:
+  '@firebase/util': true
+  bcrypt: true
+  core-js: true
+  esbuild: true
+  protobufjs: true

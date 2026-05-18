@@ -3,11 +3,11 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: 'crop-38fc3.firebaseapp.com',
-  projectId: 'crop-38fc3',
-  storageBucket: 'crop-38fc3.firebasestorage.app',
-  messagingSenderId: '416242623276',
-  appId: '1:416242623276:web:fa8f397e807e7d7c798289',
+  authDomain: "campussync-24129.firebaseapp.com",
+  projectId: "campussync-24129",
+  storageBucket: "campussync-24129.firebasestorage.app",
+  messagingSenderId: "302271905609",
+  appId: "1:302271905609:web:795830cd011e7d1883a498"
 }
 
 // Initialize Firebase
