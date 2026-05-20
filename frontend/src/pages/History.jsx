@@ -27,7 +27,7 @@ const History = () => {
   /* ---------- FETCH ---------- */
   const myNotes = async () => {
     try {
-      const res = await axios.get(`${serverUrl}/api/notes/getnotes`, {
+      const res = await axios.get(`${serverUrl}/api/notes/getnotes?t=${Date.now()}`, {
         withCredentials: true,
       })
       setNotes(res.data.notes || [])
@@ -54,7 +54,20 @@ const History = () => {
     myNotes()
     const handleResize = () => setIsMobile(window.innerWidth < 1024)
     window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
+    
+    // Listen for custom voice action event to force open a note
+    const handleOpenNote = (e) => {
+      if (e.detail) {
+        setActiveNote(e.detail)
+        closeMenuIfMobile()
+      }
+    }
+    window.addEventListener("cs-open-note", handleOpenNote)
+    
+    return () => {
+      window.removeEventListener("resize", handleResize)
+      window.removeEventListener("cs-open-note", handleOpenNote)
+    }
   }, [])
 
   const closeMenuIfMobile = () => {

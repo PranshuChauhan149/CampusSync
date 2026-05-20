@@ -10,9 +10,9 @@ import {
 } from "lucide-react"
 import { useDispatch, useSelector } from "react-redux"
 import { fetchMarketplaceItems } from "../servers/api"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useTheme } from "../context/ThemeContext"
-
+ 
 const CATEGORIES = [
   "all",
   "books",
@@ -23,20 +23,26 @@ const CATEGORIES = [
   "furniture",
   "other",
 ]
-
+ 
 const MarketPlace = () => {
   const { isDark } = useTheme()
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const { items, loading } = useSelector((state) => state.marketplace)
-
-  const [search, setSearch] = useState("")
-  const [category, setCategory] = useState("all")
-
+  const [searchParams] = useSearchParams()
+ 
+  const [search, setSearch] = useState(searchParams.get("search") || "")
+  const [category, setCategory] = useState(searchParams.get("category") || "all")
+ 
   useEffect(() => {
     fetchMarketplaceItems(dispatch, { category: "all" })
   }, [dispatch])
 
+  useEffect(() => {
+    setSearch(searchParams.get("search") || "")
+    setCategory(searchParams.get("category") || "all")
+  }, [searchParams])
+ 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchMarketplaceItems(dispatch, {

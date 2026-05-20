@@ -15,7 +15,7 @@ const FloatingActions = () => {
   }, [location.pathname])
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-3">
       
       {/* ACTION BUTTONS */}
       <AnimatePresence>
@@ -38,13 +38,13 @@ const FloatingActions = () => {
           </>
         )}
       </AnimatePresence>
-
+ 
       {/* MAIN FAB */}
       <motion.button
         onClick={() => setOpen(!open)}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/40 flex items-center justify-center"
+        className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/40 flex items-center justify-center"
       >
         <motion.div animate={{ rotate: open ? 45 : 0 }}>
           <Plus size={26} />
@@ -53,10 +53,10 @@ const FloatingActions = () => {
     </div>
   )
 }
-
+ 
 export default FloatingActions
-
-
+ 
+ 
 // ✅ Fully Clickable Action Button
 const ActionBtn = ({ to, label, icon: Icon, delay, isDark }) => {
   return (
@@ -71,6 +71,19 @@ const ActionBtn = ({ to, label, icon: Icon, delay, isDark }) => {
         to={to}
         className="flex items-center gap-3 group"
       >
+        {/* Icon Square */}
+        <div
+          className={`
+            w-11 h-11 rounded-xl shadow-lg flex items-center justify-center
+            transition
+            ${isDark
+              ? "bg-gray-800 text-white group-hover:bg-gray-700"
+              : "bg-white text-gray-700 group-hover:bg-gray-100"}
+          `}
+        >
+          <Icon size={20} />
+        </div>
+
         {/* Label */}
         <div
           className={`
@@ -82,19 +95,6 @@ const ActionBtn = ({ to, label, icon: Icon, delay, isDark }) => {
           `}
         >
           {label}
-        </div>
-
-        {/* Icon Circle */}
-        <div
-          className={`
-            w-11 h-11 rounded-full shadow-lg flex items-center justify-center
-            transition
-            ${isDark
-              ? "bg-gray-800 text-white group-hover:bg-gray-700"
-              : "bg-white text-gray-700 group-hover:bg-gray-100"}
-          `}
-        >
-          <Icon size={20} />
         </div>
       </Link>
     </motion.div>

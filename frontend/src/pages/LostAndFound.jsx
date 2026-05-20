@@ -2,24 +2,31 @@ import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { MapPin, CalendarDays, User, CheckCircle } from "lucide-react"
 import { useDispatch, useSelector } from "react-redux"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { fetchItems } from "../servers/api"
 import { useTheme } from "../context/ThemeContext"
-
+ 
 const LostAndFound = () => {
   const { isDark } = useTheme()
   const { userData } = useSelector((state) => state.user)
   const { itemData } = useSelector((state) => state.item)
   const dispatch = useDispatch()
   const navigate = useNavigate()
-
-  const [filterType, setFilterType] = useState("all")
-  const [filterCategory, setFilterCategory] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
-
+  const [searchParams] = useSearchParams()
+ 
+  const [filterType, setFilterType] = useState(searchParams.get("type") || "all")
+  const [filterCategory, setFilterCategory] = useState(searchParams.get("category") || "all")
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "")
+ 
   useEffect(() => {
     fetchItems(dispatch)
   }, [dispatch])
+
+  useEffect(() => {
+    setFilterType(searchParams.get("type") || "all")
+    setFilterCategory(searchParams.get("category") || "all")
+    setSearchQuery(searchParams.get("search") || "")
+  }, [searchParams])
 
   const filteredItems = itemData.filter((item) => {
     if (filterType !== "all" && item.type !== filterType) return false
