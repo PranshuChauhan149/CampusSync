@@ -107,8 +107,8 @@ const AddSellItem = () => {
       formData.append("price", price)
       formData.append("category", category)
       formData.append("condition", condition || "good")
-      formData.append("description", description)
-      formData.append("location", location)
+      formData.append("description", description || "No description provided.")
+      formData.append("location", location || "Campus")
 
       images.forEach((img) => formData.append("images", img))
 

@@ -159,7 +159,7 @@ const AddItemForm = ({ loading, setLoading }) => {
       formData.append("category", category)
       formData.append("location", location)
       formData.append("date", date)
-      formData.append("description", description)
+      formData.append("description", description || "No description provided.")
       if (image) formData.append("image", image)
 
       await axios.post(`${serverUrl}/api/item/add`, formData, {

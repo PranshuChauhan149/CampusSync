@@ -163,12 +163,12 @@ const App = () => {
         }
       },
       fillSignUpForm: {
-        description: "Fills out the user registration/sign-up form. IMPORTANT: You MUST ask ONE question at a time. Ask for Full Name, wait for answer. Then ask for Phone Number, wait for answer. Then Email, wait for answer. Then Password, wait for answer. NEVER ask for multiple fields in the same response. Include ALL previously answered fields plus the new one in every call. After ALL fields are filled, say 'All fields are ready! Shall I create your account now?' and WAIT for confirmation. Only call with submit:true after user confirms.",
+        description: "Fills out the user registration/sign-up form. Extract any and all information the user provides at once. If any required information (Name, Phone, Email, Password) is missing, ask for it. After ALL fields are filled, say 'All fields are ready! Shall I create your account now?' and WAIT for confirmation. Only call with submit:true after user confirms.",
         params: {
-          name: { type: "string", required: false, description: "Full Name. Ask first." },
-          phone: { type: "string", required: false, description: "Phone number. Ask second." },
-          email: { type: "string", required: false, description: "Email address. Ask third." },
-          password: { type: "string", required: false, description: "Password. Ask fourth." },
+          name: { type: "string", required: false, description: "Full Name." },
+          phone: { type: "string", required: false, description: "Phone number." },
+          email: { type: "string", required: false, description: "Email address." },
+          password: { type: "string", required: false, description: "Password." },
           submit: { type: "boolean", required: false, description: "Set to true ONLY after user explicitly confirms they want to create the account." }
         },
         handler: async ({ name, phone, email, password, submit = false }) => {
@@ -202,10 +202,10 @@ const App = () => {
         }
       },
       fillLoginForm: {
-        description: "Fills out the login form. Ask for Email first, then Password. After both are filled say 'Ready to log in! Shall I sign you in?' and WAIT for the user to confirm. Only call with submit:true after they say yes.",
+        description: "Fills out the login form. Extract the email and password if the user provides them. If any are missing, ask for them. After both are filled say 'Ready to log in! Shall I sign you in?' and WAIT for the user to confirm. Only call with submit:true after they say yes.",
         params: {
-          email: { type: "string", required: false, description: "Email address. Ask first." },
-          password: { type: "string", required: false, description: "Password. Ask second." },
+          email: { type: "string", required: false, description: "Email address." },
+          password: { type: "string", required: false, description: "Password." },
           submit: { type: "boolean", required: false, description: "Set to true ONLY after user confirms they want to log in." }
         },
         handler: async ({ email, password, submit = false }) => {
@@ -233,14 +233,14 @@ const App = () => {
         }
       },
       fillLostItemForm: {
-        description: "Fills out the report lost or found item form. IMPORTANT: You MUST call this action immediately every time the user provides a field so they see it typing. Ask for ONE field at a time: Type (lost/found), then Title, then Description, then Category, then Location, then Date. Include ALL previously answered fields plus the new one in every call. After ALL fields are filled, say 'All done! Shall I post this item?' and WAIT for confirmation. Only call with submit:true after user confirms.",
+        description: "Fills out the report lost or found item form. Extract any and all details the user provides from their description and infer the fields as appropriately as you can. Call this action to update the form so they see it typing. If essential fields (Type, Title, Category, Location, Date) are missing, ask for them. Do NOT list or repeat the details of what you filled in the form back to the user; they can see it on screen. Simply say 'I've filled out the form. Ready to post?' or 'All done! Shall I post this item?' and WAIT for confirmation. Only call with submit:true after user confirms.",
         params: {
-          type: { type: "string", required: false, description: "Type: 'lost' or 'found'. Ask first." },
-          title: { type: "string", required: false, description: "Title of the item. Ask second." },
-          description: { type: "string", required: false, description: "Description. Ask third." },
-          category: { type: "string", required: false, description: "Category. Ask fourth." },
-          location: { type: "string", required: false, description: "Location. Ask fifth." },
-          date: { type: "string", required: false, description: "Date (YYYY-MM-DD). Ask sixth." },
+          type: { type: "string", required: false, description: "Type: 'lost' or 'found'." },
+          title: { type: "string", required: false, description: "Title of the item." },
+          description: { type: "string", required: false, description: "Description." },
+          category: { type: "string", required: false, description: "Category. Must be one of: electronics, books, clothing, accessories, documents, keys, wallet, bag, id_cards, mobile, laptop, pets, jewelry, vehicles, other." },
+          location: { type: "string", required: false, description: "Location." },
+          date: { type: "string", required: false, description: "Date (YYYY-MM-DD). If user doesn't say, ask them or use today's date." },
           submit: { type: "boolean", required: false, description: "Set to true ONLY after user confirms posting." }
         },
         handler: async ({ type, title, description, category, location, date, submit = false }) => {
@@ -249,11 +249,28 @@ const App = () => {
             await new Promise(r => setTimeout(r, 400));
           }
  
+          let finalTitle = title;
+          let finalDescription = description || "No description provided.";
+          let finalLocation = location;
+          let finalDate = date;
+          let finalCategory = category;
+
+          if (submit) {
+            if (!finalTitle) finalTitle = "Lost/Found Item";
+            if (!finalLocation) finalLocation = "Campus";
+            if (!finalCategory) finalCategory = "other";
+            if (!finalDate || finalDate.toLowerCase() === "today") {
+              finalDate = new Date().toISOString().split("T")[0];
+            }
+          } else if (finalDate && finalDate.toLowerCase() === "today") {
+            finalDate = new Date().toISOString().split("T")[0];
+          }
+
           const map = {};
-          if (title) map['input[placeholder="e.g. Black Backpack"]'] = title;
-          if (description) map['textarea[placeholder="Details about the item..."]'] = description;
-          if (location) map['input[placeholder="Where lost/found?"]'] = location;
-          if (date) map['input[type="date"]'] = date;
+          if (finalTitle) map['input[placeholder="e.g. Black Backpack"]'] = finalTitle;
+          if (finalDescription) map['textarea[placeholder="Details about the item..."]'] = finalDescription;
+          if (finalLocation) map['input[placeholder="Where lost/found?"]'] = finalLocation;
+          if (finalDate) map['input[type="date"]'] = finalDate;
  
           await fillWhenReady(map);
 
@@ -266,11 +283,11 @@ const App = () => {
             if (toggleBtn) toggleBtn.click();
           }
 
-          if (category) {
+          if (finalCategory) {
             const select = document.querySelector("select");
             if (select) {
-              if (nativeSel) nativeSel.call(select, category.toLowerCase());
-              else select.value = category.toLowerCase();
+              if (nativeSel) nativeSel.call(select, finalCategory.toLowerCase());
+              else select.value = finalCategory.toLowerCase();
               select.dispatchEvent(new Event("input", { bubbles: true }));
               select.dispatchEvent(new Event("change", { bubbles: true }));
             }
@@ -285,7 +302,6 @@ const App = () => {
               const form = document.querySelector("form"); 
               if (form) try { form.requestSubmit(); } catch (_) {}
             }
-            speak("Your item has been posted.");
           }
  
           return { status: "success", submitted: submit };
@@ -506,18 +522,20 @@ const App = () => {
 
           const nativeSel = Object.getOwnPropertyDescriptor(window.HTMLSelectElement?.prototype, "value")?.set;
           const selects = document.querySelectorAll("select");
-          if (level && selects[0]) {
-            if (nativeSel) nativeSel.call(selects[0], level);
-            else selects[0].value = level;
-            selects[0].dispatchEvent(new Event("input", { bubbles: true }));
-            selects[0].dispatchEvent(new Event("change", { bubbles: true }));
-          }
-          if (examType && selects[1]) {
-            if (nativeSel) nativeSel.call(selects[1], examType);
-            else selects[1].value = examType;
-            selects[1].dispatchEvent(new Event("input", { bubbles: true }));
-            selects[1].dispatchEvent(new Event("change", { bubbles: true }));
-          }
+          
+          const setSelectByTextOrValue = (selectEl, val) => {
+            if (!selectEl || !val) return;
+            const options = Array.from(selectEl.options);
+            const found = options.find(o => o.value.toLowerCase() === val.toLowerCase() || o.text.toLowerCase() === val.toLowerCase());
+            const targetVal = found ? found.value : val;
+            if (nativeSel) nativeSel.call(selectEl, targetVal);
+            else selectEl.value = targetVal;
+            selectEl.dispatchEvent(new Event("input", { bubbles: true }));
+            selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+          };
+
+          if (level) setSelectByTextOrValue(selects[0], level);
+          if (examType) setSelectByTextOrValue(selects[1], examType);
 
           if (submit) {
             // Wait for React to process state updates from the filled fields
@@ -526,11 +544,13 @@ const App = () => {
             const btn = Array.from(document.querySelectorAll("button")).find(b => /generate notes|generating/i.test(b.textContent));
             if (btn && !btn.disabled) {
               btn.click();
-            } else {
-              // Fallback: submit the form directly
+            }
+            
+            // Fallback: safely ensure the form is submitted if the click didn't trigger it
+            setTimeout(() => {
               const form = document.querySelector("form");
               if (form) { try { form.requestSubmit(); } catch (_) {} }
-            }
+            }, 100);
           }
 
           return { status: "success", submitted: submit };
@@ -669,7 +689,6 @@ const App = () => {
       // ── SMART CONTEXT ACTIONS ──────────────────────────────────────────────
       submitCurrentForm: {
         description: "Submit whatever form is currently on screen. Use for 'submit this form', 'submit now', 'confirm and submit'.",
-        dangerous: true,
         handler: async () => {
           const btn = document.querySelector('button[type="submit"]') ||
             Array.from(document.querySelectorAll("button")).find(b =>
